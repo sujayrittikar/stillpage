@@ -1,0 +1,161 @@
+{
+  "name": "stillpage",
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "assets": "node scripts/copy-pdf-assets.mjs",
+    "dev": "npm run assets && node scripts/dev.mjs",
+    "build": "npm run assets && tsc -b && vite build",
+    "start": "npm run build && electron . --no-sandbox",
+    "dist": "npm run build && electron-builder --linux deb AppImage",
+    "dist:deb": "npm run build && electron-builder --linux deb",
+    "lint": "oxlint src electron",
+    "typecheck": "tsc -b"
+  },
+  "devDependencies": {
+    "@fontsource-variable/figtree": "^5.3.0",
+    "@fontsource-variable/literata": "^5.3.0",
+    "@fontsource/ibm-plex-mono": "^5.3.0",
+    "@types/node": "^24.19.2",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.1.2",
+    "dompurify": "^3.4.17",
+    "electron": "github:castlabs/electron-releases#v44.9.3+wvcus",
+    "electron-builder": "^26.18.0",
+    "highlight.js": "^11.12.0",
+    "idb-keyval": "^6.3.0",
+    "jszip": "^3.10.2",
+    "mammoth": "^1.13.0",
+    "marked": "^18.1.1",
+    "oxlint": "^1.88.0",
+    "pdfjs-dist": "^6.4.299",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "typescript": "~6.0.3",
+    "vite": "^8.3.4",
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
+  },
+  "productName": "Stillpage",
+  "description": "A calm, distraction-free reader and notebook for PDFs, Office files, EPUB, Markdown and more \u2014 with split panes and Spotify built in.",
+  "license": "MIT",
+  "author": {
+    "name": "Sujay Rittikar",
+    "email": "suj00rit20@gmail.com"
+  },
+  "homepage": "https://github.com/sujayrittikar/stillpage",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/sujayrittikar/stillpage.git"
+  },
+  "main": "electron/main.cjs",
+  "build": {
+    "appId": "io.github.sujayrittikar.stillpage",
+    "productName": "Stillpage",
+    "copyright": "\u00a9 2026 Sujay Rittikar",
+    "files": [
+      "dist/**",
+      "electron/**",
+      "build/icon.png",
+      "package.json"
+    ],
+    "directories": {
+      "output": "release",
+      "buildResources": "build"
+    },
+    "fileAssociations": [
+      {
+        "ext": [
+          "pdf"
+        ],
+        "name": "PDF document",
+        "mimeType": "application/pdf"
+      },
+      {
+        "ext": [
+          "md",
+          "markdown"
+        ],
+        "name": "Markdown",
+        "mimeType": "text/markdown"
+      },
+      {
+        "ext": [
+          "docx"
+        ],
+        "name": "Word document",
+        "mimeType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+      },
+      {
+        "ext": [
+          "pptx"
+        ],
+        "name": "PowerPoint",
+        "mimeType": "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+      },
+      {
+        "ext": [
+          "xlsx"
+        ],
+        "name": "Excel workbook",
+        "mimeType": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+      },
+      {
+        "ext": [
+          "epub"
+        ],
+        "name": "EPUB book",
+        "mimeType": "application/epub+zip"
+      },
+      {
+        "ext": [
+          "odt"
+        ],
+        "name": "OpenDocument text",
+        "mimeType": "application/vnd.oasis.opendocument.text"
+      },
+      {
+        "ext": [
+          "ipynb"
+        ],
+        "name": "Jupyter notebook",
+        "mimeType": "application/x-ipynb+json"
+      }
+    ],
+    "linux": {
+      "target": [
+        "deb",
+        "AppImage"
+      ],
+      "category": "Office",
+      "icon": "build/icon.png",
+      "synopsis": "A calm reader and notebook",
+      "desktop": {
+        "entry": {
+          "StartupWMClass": "Stillpage",
+          "Keywords": "pdf;reader;notes;markdown;epub;focus;"
+        }
+      },
+      "executableName": "stillpage",
+      "artifactName": "${productName}-${version}-${arch}.${ext}",
+      "syncDesktopName": true
+    },
+    "deb": {
+      "depends": [
+        "libgtk-3-0",
+        "libnotify4",
+        "libnss3",
+        "libxss1",
+        "libxtst6",
+        "xdg-utils",
+        "libatspi2.0-0",
+        "libuuid1",
+        "libsecret-1-0"
+      ]
+    },
+    "electronDist": "node_modules/electron/dist",
+    "electronVersion": "44.9.3",
+    "publish": null
+  },
+  "desktopName": "stillpage.desktop"
+}
