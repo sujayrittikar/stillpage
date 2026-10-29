@@ -25,5 +25,7 @@ contextBridge.exposeInMainWorld('stillpage', {
   exportPdf: (name, html) => ipcRenderer.invoke('export-pdf', name, html),
   saveFile: (name, text) => ipcRenderer.invoke('save-file', name, text),
   showInFolder: (file) => ipcRenderer.invoke('show-in-folder', file),
+  officeStatus: () => ipcRenderer.invoke('office-status'),
+  convertToPdf: (name, data) => ipcRenderer.invoke('convert-to-pdf', name, data),
   openExternal: (url) => ipcRenderer.invoke('open-external', url),
 })

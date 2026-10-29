@@ -27,6 +27,7 @@ const PATHS: Record<string, ReactNode> = {
       <path d="M6.75 19.5h10.5" />
     </>
   ),
+  page: <><path d="M6.5 3.5h7.5l4 4v13h-11.5z" /><path d="M13.5 3.5v4.5h4.5M9.5 12h5M9.5 15h5M9.5 18h3" /></>,
   fullscreen: <path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5" />,
   read: <><path d="M3.5 6.5c3-1.2 5.8-1.2 8.5 1 2.7-2.2 5.5-2.2 8.5-1v12c-3-1.2-5.8-1.2-8.5 1-2.7-2.2-5.5-2.2-8.5-1z" /><path d="M12 7.5v12" /></>,
   write: <><path d="M4 7h16M4 12h10M4 17h7" /></>,

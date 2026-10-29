@@ -1,6 +1,6 @@
 {
   "name": "stillpage",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "type": "module",
   "scripts": {
     "assets": "node scripts/copy-pdf-assets.mjs",
@@ -43,7 +43,7 @@
     "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
   },
   "productName": "Stillpage",
-  "description": "A calm, distraction-free reader and notebook for PDFs, Office files, EPUB, Markdown and more — with split panes and Spotify built in.",
+  "description": "A calm, distraction-free reader and notebook for PDFs, Office files, EPUB, Markdown and more \u2014 with split panes and Spotify built in.",
   "license": "MIT",
   "author": {
     "name": "Sujay Rittikar",
@@ -58,7 +58,7 @@
   "build": {
     "appId": "io.github.sujayrittikar.stillpage",
     "productName": "Stillpage",
-    "copyright": "© 2026 Sujay Rittikar",
+    "copyright": "\u00a9 2026 Sujay Rittikar",
     "files": [
       "dist/**",
       "electron/**",
@@ -126,6 +126,55 @@
         ],
         "name": "Jupyter notebook",
         "mimeType": "application/x-ipynb+json"
+      },
+      {
+        "ext": [
+          "odp"
+        ],
+        "name": "OpenDocument presentation",
+        "mimeType": "application/vnd.oasis.opendocument.presentation"
+      },
+      {
+        "ext": [
+          "ods"
+        ],
+        "name": "OpenDocument spreadsheet",
+        "mimeType": "application/vnd.oasis.opendocument.spreadsheet"
+      },
+      {
+        "ext": [
+          "odg"
+        ],
+        "name": "OpenDocument drawing",
+        "mimeType": "application/vnd.oasis.opendocument.graphics"
+      },
+      {
+        "ext": [
+          "doc"
+        ],
+        "name": "Word 97-2003 document",
+        "mimeType": "application/msword"
+      },
+      {
+        "ext": [
+          "ppt"
+        ],
+        "name": "PowerPoint 97-2003 presentation",
+        "mimeType": "application/vnd.ms-powerpoint"
+      },
+      {
+        "ext": [
+          "xls"
+        ],
+        "name": "Excel 97-2003 workbook",
+        "mimeType": "application/vnd.ms-excel"
+      },
+      {
+        "ext": [
+          "rtf"
+        ],
+        "name": "Rich Text document",
+        "mimeType": "application/rtf"
       }
     ],
     "linux": {

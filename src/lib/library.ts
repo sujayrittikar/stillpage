@@ -1,6 +1,6 @@
 import { useSyncExternalStore } from 'react'
 import { db, uid } from './db'
-import { detectFormat, extOf, UNSUPPORTED_HINT } from './formats'
+import { detectFormat, extOf } from './formats'
 import type { Item } from './types'
 
 // ---- Items (documents + notes metadata) -----------------------------------
@@ -51,7 +51,7 @@ export async function importFiles(files: File[]): Promise<ImportResult> {
   for (const file of files) {
     const format = detectFormat(file.name)
     if (!format) {
-      rejected.push(UNSUPPORTED_HINT[extOf(file.name)] ?? `${file.name} is not a format Stillpage can read yet.`)
+      rejected.push(`${file.name} is not a format Stillpage can read yet.`)
       continue
     }
     const fingerprint = `${file.name}:${file.size}:${file.lastModified}`
@@ -86,6 +86,16 @@ export function getBlob(id: string): Promise<Blob | undefined> {
   return db.get<Blob>('blob:' + id)
 }
 
+/** The author's-layout PDF LibreOffice made for a document, kept so each file
+ *  is converted once. */
+export function getOriginal(id: string): Promise<Blob | undefined> {
+  return db.get<Blob>('original:' + id)
+}
+
+export function setOriginal(id: string, pdf: Blob): Promise<void> {
+  return db.set('original:' + id, pdf)
+}
+
 export function createNote(initial = ''): string {
   const id = uid()
   const now = Date.now()
@@ -104,6 +114,7 @@ export async function removeItem(id: string) {
   emit()
   persist()
   await db.del(item.kind === 'note' ? 'note:' + id : 'blob:' + id)
+  if (item.kind === 'doc') await db.del('original:' + id)
   notes.delete(id)
 }
 

@@ -10,6 +10,8 @@ export type Format =
   | 'code'
   | 'image'
   | 'odt'
+  | 'odp'
+  | 'office'
   | 'rtf'
   | 'ipynb'
 
@@ -66,6 +68,10 @@ export interface Sheet {
   rows: string[][]
 }
 
+/** How a laid-out document is shown: reflowed in Stillpage's typography, or
+ *  as the author's own pages (rendered by LibreOffice). */
+export type DocView = 'reading' | 'original'
+
 export type Rendered =
   | { type: 'html'; html: string; variant?: 'code' | 'plain' }
   | { type: 'pdf'; data: ArrayBuffer }
@@ -98,6 +104,8 @@ declare global {
       exportPdf: (name: string, html: string) => Promise<string | null>
       saveFile: (name: string, text: string) => Promise<string | null>
       showInFolder: (file: string) => Promise<void>
+      officeStatus: () => Promise<{ ready: boolean; install: string }>
+      convertToPdf: (name: string, data: Uint8Array) => Promise<{ pdf?: Uint8Array; error?: string }>
       openExternal: (url: string) => Promise<void>
     }
   }

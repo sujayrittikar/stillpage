@@ -340,6 +340,98 @@ ipcMain.handle('show-in-folder', (_event, file) => {
   if (typeof file === 'string' && path.isAbsolute(file)) shell.showItemInFolder(file)
 })
 
+// ---------- LibreOffice ----------
+// Old Word/PowerPoint files, drawings, Pages, Keynote and friends have no
+// browser-side reader; LibreOffice can draw any of them as PDF pages. We use
+// whatever LibreOffice the person already has (distro package, snap, flatpak
+// or the official /opt build) and never bundle it.
+
+let officeBinary
+function findOffice() {
+  if (officeBinary !== undefined) return officeBinary
+  const candidates = [
+    process.env.STILLPAGE_SOFFICE,
+    ...(process.env.PATH ?? '').split(':').flatMap((dir) => [path.join(dir, 'soffice'), path.join(dir, 'libreoffice')]),
+    '/usr/lib/libreoffice/program/soffice',
+    '/snap/bin/libreoffice',
+    path.join(app.getPath('home'), '.local/share/flatpak/exports/bin/org.libreoffice.LibreOffice'),
+    '/var/lib/flatpak/exports/bin/org.libreoffice.LibreOffice',
+  ]
+  try {
+    for (const dir of fs.readdirSync('/opt')) if (/^libreoffice/i.test(dir)) candidates.push(path.join('/opt', dir, 'program', 'soffice'))
+  } catch {}
+  officeBinary = candidates.find((file) => {
+    try {
+      return file && fs.statSync(file).isFile() && (fs.accessSync(file, fs.constants.X_OK), true)
+    } catch {
+      return false
+    }
+  }) ?? null
+  return officeBinary
+}
+
+// One conversion at a time: they share a LibreOffice profile.
+let officeQueue = Promise.resolve()
+
+function convertToPdf(name, data) {
+  const run = async () => {
+    const soffice = findOffice()
+    if (!soffice) throw new Error('no-office')
+    // Inside the user's data folder rather than /tmp, which a flatpak
+    // LibreOffice cannot see.
+    const work = fs.mkdtempSync(path.join(app.getPath('userData'), 'convert-'))
+    const profile = pathToFileURL(path.join(app.getPath('userData'), 'libreoffice-profile')).href
+    try {
+      const input = path.join(work, path.basename(String(name)).replace(/[^\w.\- ]/g, '_') || 'document')
+      fs.writeFileSync(input, Buffer.from(data))
+      await new Promise((resolve, reject) => {
+        require('node:child_process').execFile(
+          soffice,
+          // Its own profile, so it works even while LibreOffice is open.
+          [`-env:UserInstallation=${profile}`, '--headless', '--norestore', '--nolockcheck', '--convert-to', 'pdf', '--outdir', work, input],
+          { timeout: 180000 },
+          (err) => (err ? reject(err) : resolve()),
+        )
+      })
+      const pdf = fs.readdirSync(work).find((f) => f.toLowerCase().endsWith('.pdf'))
+      if (!pdf) throw new Error('LibreOffice could not convert this file.')
+      return fs.readFileSync(path.join(work, pdf))
+    } finally {
+      fs.rmSync(work, { recursive: true, force: true })
+    }
+  }
+  const job = officeQueue.then(run, run)
+  officeQueue = job.catch(() => {})
+  return job
+}
+
+/** The one command that installs LibreOffice on this distro. */
+function officeInstallCommand() {
+  let ids = ''
+  try {
+    const release = fs.readFileSync('/etc/os-release', 'utf8')
+    ids = [/^ID=(.*)$/m, /^ID_LIKE=(.*)$/m].map((re) => re.exec(release)?.[1] ?? '').join(' ').replace(/"/g, '')
+  } catch {}
+  if (/\b(debian|ubuntu)\b/.test(ids)) return 'sudo apt install libreoffice-writer libreoffice-impress libreoffice-draw'
+  if (/\barch\b/.test(ids)) return 'sudo pacman -S libreoffice-fresh'
+  if (/\b(fedora|rhel)\b/.test(ids)) return 'sudo dnf install libreoffice-writer libreoffice-impress libreoffice-draw'
+  if (/\b(suse|opensuse)\b/.test(ids)) return 'sudo zypper install libreoffice'
+  return 'flatpak install flathub org.libreoffice.LibreOffice'
+}
+
+ipcMain.handle('office-status', () => {
+  officeBinary = undefined // look again: it may have just been installed
+  return { ready: Boolean(findOffice()), install: officeInstallCommand() }
+})
+ipcMain.handle('convert-to-pdf', async (_event, name, data) => {
+  if (!(data instanceof Uint8Array) || data.byteLength > MAX_FILE_BYTES) return { error: 'This file is too large to convert.' }
+  try {
+    return { pdf: await convertToPdf(name, data) }
+  } catch (err) {
+    return { error: err?.message === 'no-office' ? 'no-office' : 'LibreOffice could not open this file. It may be damaged or password-protected.' }
+  }
+})
+
 ipcMain.handle('take-pending-files', () => {
   rendererReady = true
   const paths = pendingPaths

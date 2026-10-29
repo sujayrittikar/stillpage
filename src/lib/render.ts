@@ -1,18 +1,39 @@
 import { CODE_LANG } from './formats'
-import { getBlob } from './library'
-import type { Item, Rendered } from './types'
+import { getBlob, getOriginal, setOriginal } from './library'
+import type { DocView, Item, Rendered } from './types'
 
 const cache = new Map<string, Promise<Rendered>>()
 
-/** Parses a stored document once and shares the result between panes. */
-export function renderItem(item: Item): Promise<Rendered> {
-  let p = cache.get(item.id)
+/** LibreOffice is needed to show this file and isn't installed. */
+export class NeedsOffice extends Error {}
+
+/** Parses a stored document once per view and shares the result between panes. */
+export function renderItem(item: Item, view: DocView = 'reading'): Promise<Rendered> {
+  const original = view === 'original' || item.format === 'office'
+  const key = `${item.id}:${original ? 'original' : 'reading'}`
+  let p = cache.get(key)
   if (!p) {
-    p = load(item)
-    p.catch(() => cache.delete(item.id))
-    cache.set(item.id, p)
+    p = original ? loadOriginal(item) : load(item)
+    p.catch(() => cache.delete(key))
+    cache.set(key, p)
   }
   return p
+}
+
+/** The author's own pages, drawn by LibreOffice and kept after the first time. */
+async function loadOriginal(item: Item): Promise<Rendered> {
+  const saved = await getOriginal(item.id)
+  if (saved) return { type: 'pdf', data: await saved.arrayBuffer() }
+  const bridge = window.stillpage
+  if (!bridge?.convertToPdf) throw new NeedsOffice()
+  const blob = await getBlob(item.id)
+  if (!blob) throw new Error('This file is no longer in your library. Open it again from disk.')
+  const result = await bridge.convertToPdf(`${item.title}.${item.ext ?? 'doc'}`, new Uint8Array(await blob.arrayBuffer()))
+  if (result.error === 'no-office') throw new NeedsOffice()
+  if (!result.pdf) throw new Error(result.error ?? 'This file could not be opened.')
+  const pdf = new Blob([result.pdf as BlobPart], { type: 'application/pdf' })
+  await setOriginal(item.id, pdf)
+  return { type: 'pdf', data: await pdf.arrayBuffer() }
 }
 
 async function load(item: Item): Promise<Rendered> {
@@ -45,6 +66,10 @@ async function load(item: Item): Promise<Rendered> {
     case 'odt': {
       const { renderOdt } = await import('./parse/odt')
       return { type: 'html', html: await renderOdt(await blob.arrayBuffer()) }
+    }
+    case 'odp': {
+      const { renderOdp } = await import('./parse/odp')
+      return { type: 'slides', slides: await renderOdp(await blob.arrayBuffer()) }
     }
     case 'rtf': {
       const { renderRtf } = await import('./parse/rtf')
