@@ -1,0 +1,36 @@
+# Maintainer: Sujay Rittikar <suj00rit20 at gmail dot com>
+pkgname=stillpage-bin
+_pkgname=stillpage
+pkgver=0.1.4
+pkgrel=1
+pkgdesc='A calm, distraction-free reader and notebook for PDFs, Office and LibreOffice files, EPUB and Markdown'
+arch=('x86_64')
+url='https://github.com/sujayrittikar/stillpage'
+license=('MIT')
+depends=('alsa-lib' 'at-spi2-core' 'gtk3' 'libnotify' 'libsecret' 'libxss' 'libxtst' 'nss' 'util-linux-libs' 'xdg-utils')
+optdepends=('libreoffice: original page layout, and older .doc/.ppt, Visio, Publisher, Pages and Keynote files'
+            'xorg-xwayland: spanning one window across several monitors on Wayland')
+provides=("$_pkgname")
+conflicts=("$_pkgname")
+options=('!strip' '!debug')
+install=$_pkgname.install
+source=("$url/releases/download/v$pkgver/Stillpage-$pkgver-amd64.deb"
+        "LICENSE-$pkgver::https://raw.githubusercontent.com/sujayrittikar/stillpage/v$pkgver/LICENSE")
+noextract=("Stillpage-$pkgver-amd64.deb")
+sha256sums=('baf56cbb02cccf25f139e4d2e03ddc5474a029182c882d0d31dc6dd9f36981eb'
+            'b10bbc1e6fc9a4c4293a0950b5ad8f866d3961db825b2fb1f39c48d99d09312a')
+
+package() {
+  bsdtar -xOf "Stillpage-$pkgver-amd64.deb" 'data.tar.*' | bsdtar -xf - -C "$pkgdir" --exclude './usr/share/doc'
+
+  # The .deb ships some of these group-writable.
+  find "$pkgdir/usr/share" -type f -exec chmod 644 {} +
+
+  install -dm755 "$pkgdir/usr/bin"
+  ln -s /opt/Stillpage/stillpage "$pkgdir/usr/bin/$_pkgname"
+
+  # The Ubuntu AppArmor profile has no use here.
+  rm -f "$pkgdir/opt/Stillpage/resources/apparmor-profile"
+
+  install -Dm644 "LICENSE-$pkgver" "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+}

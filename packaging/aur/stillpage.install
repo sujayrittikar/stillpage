@@ -1,0 +1,17 @@
+# Electron's setuid sandbox helper is only needed where unprivileged user
+# namespaces are off (for example linux-hardened). Elsewhere it stays plain.
+_sandbox() {
+  if [ -L /proc/self/ns/user ] && unshare --user true 2>/dev/null; then
+    chmod 0755 /opt/Stillpage/chrome-sandbox
+  else
+    chmod 4755 /opt/Stillpage/chrome-sandbox
+  fi
+}
+
+post_install() {
+  _sandbox
+}
+
+post_upgrade() {
+  _sandbox
+}

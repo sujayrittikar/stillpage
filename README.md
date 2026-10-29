@@ -53,6 +53,25 @@ sudo apt install ./Stillpage-*-amd64.deb
 
 Stillpage then shows up in your app launcher, and "Open with Stillpage" appears in your file manager for PDFs, Office files, EPUBs and Markdown.
 
+**Arch, Manjaro, EndeavourOS**: build it from this repository with `makepkg`, which is how the AUR works too. It downloads the release, checks its checksum and installs it as a normal package:
+
+```bash
+git clone https://github.com/sujayrittikar/stillpage.git
+cd stillpage/packaging/aur
+makepkg -si
+```
+
+To update later, run `git pull && makepkg -si` in the same folder.
+
+Or install the ready-made package: download `stillpage-bin-*-x86_64.pkg.tar.zst` and `SHA256SUMS` from the [latest release](https://github.com/sujayrittikar/stillpage/releases/latest), then
+
+```bash
+sha256sum -c SHA256SUMS --ignore-missing
+sudo pacman -U ./stillpage-bin-*-x86_64.pkg.tar.zst
+```
+
+For the original page layout and older Office formats, also install LibreOffice: `sudo pacman -S libreoffice-fresh`. An AUR package, `stillpage-bin`, is on its way.
+
 **Any other distro**: use the AppImage.
 
 ```bash
