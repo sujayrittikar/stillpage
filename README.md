@@ -21,7 +21,7 @@ Studying usually means one app for the PDF, another for notes, a browser tab for
 
 - **Reads almost anything**: PDF, Word (`.docx`), PowerPoint (`.pptx`), Excel (`.xlsx`, `.xls`, `.ods`), CSV and TSV, EPUB, Markdown, Jupyter notebooks (`.ipynb`), OpenDocument text (`.odt`), RTF, HTML, plain text, images, and source code in about 50 languages.
 - **Two screens, one window**: `Ctrl Shift S` turns Stillpage into one full-screen window across every monitor, with the pane divider on the bezel. Press it again to go back.
-- **Split panes with tabs**: up to four side-by-side panes, each with its own tabs. Drag tabs between panes, resize the dividers, and drop files from your file manager straight into a pane. Press `Ctrl Shift S` (or the two-screens button) to stretch the window over both monitors: the divider lands on the bezel, so you get a reader on one screen and a notebook on the other.
+- **Split panes with tabs**: up to four side-by-side panes, each with its own tabs. Drag tabs between panes, resize the dividers, and drop files from your file manager straight into a pane.
 - **Notes beside the source**: Markdown notes that save as you type. Select a passage in any document and choose **Add to note** to quote it, page number included.
 - **Zen mode** (`Ctrl .`): the chrome fades away and only the text remains. Move the pointer to the top edge to get the toolbar back.
 - **Typography you control**: Literata or Figtree, text size, line length and spacing. Four themes: Stone, Linen, Mist and Dusk, a soft dim theme that is not pitch black. PDF pages can take on the theme's paper tone.
