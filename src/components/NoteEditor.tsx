@@ -1,120 +1,151 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { EditorContent, useEditor, useEditorState } from '@tiptap/react'
+import { BubbleMenu } from '@tiptap/react/menus'
+import StarterKit from '@tiptap/starter-kit'
+import { Markdown } from '@tiptap/markdown'
+import { TaskItem, TaskList } from '@tiptap/extension-list'
+import { Placeholder } from '@tiptap/extensions'
 import { getItem, setNote, useNote } from '../lib/library'
 import { Icon } from './Icon'
 
-type Mode = 'write' | 'read' | 'both'
+const announce = (saved: string | null) =>
+  saved && window.dispatchEvent(new CustomEvent('stillpage:toast', { detail: `Saved ${saved.split('/').pop()}` }))
 
-function wrapSelection(ta: HTMLTextAreaElement, mark: string) {
-  const { selectionStart: s, selectionEnd: e, value } = ta
-  const picked = value.slice(s, e)
-  ta.setRangeText(mark + picked + mark, s, e, picked ? 'select' : 'end')
-  if (!picked) ta.setSelectionRange(s + mark.length, s + mark.length)
-}
+const fileName = (id: string) => (getItem(id)?.title ?? 'note').replace(/[\\/:*?"<>|]/g, '-')
 
+/** Notes are stored as Markdown but written like a document: typing `- `,
+ *  `# `, `**bold**` or `> ` turns into the real thing and the marks vanish. */
 export function NoteEditor({ id, active }: { id: string; active: boolean }) {
   const text = useNote(id)
-  const [mode, setMode] = useState<Mode>(() => (localStorage.getItem('stillpage.noteMode') as Mode) || 'write')
-  const [html, setHtml] = useState('')
-  const taRef = useRef<HTMLTextAreaElement>(null)
-  const writeScroll = useRef<HTMLDivElement>(null)
-  const localEdit = useRef(false)
-  const prevLength = useRef(text?.length ?? 0)
+  const [menu, setMenu] = useState(false)
+  // The Markdown we last wrote ourselves. Anything else arriving in the store
+  // (a quote added from a document) is an outside change to load in.
+  const ours = useRef<string | null>(null)
+  const scroller = useRef<HTMLDivElement>(null)
 
-  useEffect(() => localStorage.setItem('stillpage.noteMode', mode), [mode])
+  const editor = useEditor({
+    extensions: [
+      StarterKit.configure({ link: { openOnClick: false, autolink: true } }),
+      TaskList,
+      TaskItem.configure({ nested: true }),
+      Placeholder.configure({
+        placeholder: ({ editor }) =>
+          editor.isEmpty ? 'Start writing. Type # for a heading, - for a list, > for a quote.' : '',
+      }),
+      Markdown,
+    ],
+    editorProps: { attributes: { class: 'prose note-prose', spellcheck: 'true' } },
+    onUpdate: ({ editor }) => {
+      const md = editor.getMarkdown()
+      ours.current = md
+      setNote(id, md)
+    },
+  })
 
-  useLayoutEffect(() => {
-    const ta = taRef.current
-    if (!ta) return
-    ta.style.height = '0px'
-    ta.style.height = `${ta.scrollHeight}px`
-  }, [text, mode])
-
-  // Quotes added from a document arrive from outside: follow them to the end.
   useEffect(() => {
-    if (text === undefined) return
-    if (!localEdit.current && text.length > prevLength.current && prevLength.current > 0) {
-      const el = writeScroll.current
-      el?.scrollTo({ top: el.scrollHeight, behavior: 'smooth' })
+    if (!editor || text === undefined || text === ours.current) return
+    const appended = ours.current !== null && text.length > ours.current.length
+    ours.current = text
+    editor.commands.setContent(text, { contentType: 'markdown', emitUpdate: false })
+    if (appended) {
+      // Quotes arrive at the end: follow them.
+      requestAnimationFrame(() => scroller.current?.scrollTo({ top: scroller.current.scrollHeight, behavior: 'smooth' }))
     }
-    localEdit.current = false
-    prevLength.current = text.length
-  }, [text])
+  }, [editor, text])
 
+  // Opening an empty note puts the cursor in it. Only on opening: an empty
+  // check on every keystroke would yank the cursor out of a fresh heading.
+  const loaded = text !== undefined
   useEffect(() => {
-    if (mode === 'write' || text === undefined) return
-    let alive = true
-    void import('../lib/parse/markdown').then((m) => alive && setHtml(m.renderMarkdown(text)))
-    return () => {
-      alive = false
-    }
-  }, [text, mode])
+    if (active && editor && loaded && editor.isEmpty) editor.commands.focus('end')
+  }, [active, editor, loaded])
 
-  useEffect(() => {
-    if (active && mode !== 'read' && text !== undefined && text.trim() === '') taRef.current?.focus()
-  }, [active, mode, text])
+  const words = useEditorState({
+    editor,
+    selector: ({ editor }) => {
+      const t = editor?.state.doc.textContent.trim() ?? ''
+      return t ? t.split(/\s+/).length : 0
+    },
+  })
 
-  if (text === undefined) return null
-  const words = text.trim() ? text.trim().split(/\s+/).length : 0
+  if (text === undefined || !editor) return null
 
-  const commit = (value: string) => {
-    localEdit.current = true
-    setNote(id, value)
+  const exportMarkdown = async () => {
+    setMenu(false)
+    const md = editor.getMarkdown()
+    if (window.stillpage?.saveFile) announce(await window.stillpage.saveFile(`${fileName(id)}.md`, md))
+    else download(new Blob([md], { type: 'text/markdown' }), `${fileName(id)}.md`)
   }
 
-  const exportNote = () => {
-    const a = document.createElement('a')
-    a.href = URL.createObjectURL(new Blob([text], { type: 'text/markdown' }))
-    a.download = `${(getItem(id)?.title ?? 'note').replace(/[\\/:*?"<>|]/g, '-')}.md`
-    a.click()
-    setTimeout(() => URL.revokeObjectURL(a.href), 1000)
+  const exportPdf = async () => {
+    setMenu(false)
+    if (window.stillpage?.exportPdf) announce(await window.stillpage.exportPdf(`${fileName(id)}.pdf`, editor.getHTML()))
+    else window.print()
   }
+
+  const mark = (on: boolean) => (on ? 'on' : '')
 
   return (
-    <div className={`note mode-${mode}`}>
+    <div className="note">
       <div className="note-bar">
-        <div className="segmented" role="radiogroup" aria-label="Note view">
-          {(['write', 'both', 'read'] as Mode[]).map((m) => (
-            <button key={m} role="radio" aria-checked={mode === m} className={mode === m ? 'on' : ''} onClick={() => setMode(m)} title={m === 'both' ? 'Write and preview' : m === 'read' ? 'Preview' : 'Write'}>
-              <Icon name={m} size={15} />
-              <span>{m === 'both' ? 'Side by side' : m === 'read' ? 'Preview' : 'Write'}</span>
-            </button>
-          ))}
+        <span className="note-count">{words === 1 ? '1 word' : `${(words ?? 0).toLocaleString()} words`}</span>
+        <div className="export-anchor">
+          <button className={`icon-btn ${menu ? 'on' : ''}`} title="Export" onClick={() => setMenu((m) => !m)}>
+            <Icon name="download" size={16} />
+          </button>
+          {menu && (
+            <>
+              <div className="scrim clear" onClick={() => setMenu(false)} />
+              <div className="popover export-menu">
+                <button className="menu-item" onClick={() => void exportPdf()}>
+                  Export as PDF
+                </button>
+                <button className="menu-item" onClick={() => void exportMarkdown()}>
+                  Export as Markdown
+                </button>
+              </div>
+            </>
+          )}
         </div>
-        <span className="note-count">{words === 1 ? '1 word' : `${words.toLocaleString()} words`}</span>
-        <button className="icon-btn" title="Export as Markdown" onClick={exportNote}>
-          <Icon name="download" size={16} />
+      </div>
+      <div className="scroll note-write" ref={scroller} data-scroll onClick={(e) => e.target === e.currentTarget && editor.commands.focus('end')}>
+        <EditorContent editor={editor} />
+      </div>
+      <BubbleMenu editor={editor} className="format-bar" options={{ placement: 'top' }}>
+        <button className={mark(editor.isActive('bold'))} onClick={() => editor.chain().focus().toggleBold().run()} title="Bold (Ctrl B)">
+          <b>B</b>
         </button>
-      </div>
-      <div className="note-body">
-        {mode !== 'read' && (
-          <div className="scroll note-write" ref={writeScroll} onClick={(e) => e.target === e.currentTarget && taRef.current?.focus()}>
-            <textarea
-              ref={taRef}
-              value={text}
-              spellCheck
-              placeholder={'Start writing.\n\nSelect a passage in any document and choose “Add to note” to quote it here, with its page.'}
-              onChange={(e) => commit(e.target.value)}
-              onKeyDown={(e) => {
-                const ta = e.currentTarget
-                if (e.key === 'Tab' && !e.altKey && !e.ctrlKey && !e.metaKey) {
-                  e.preventDefault()
-                  ta.setRangeText('  ', ta.selectionStart, ta.selectionEnd, 'end')
-                  commit(ta.value)
-                } else if ((e.ctrlKey || e.metaKey) && (e.key === 'b' || e.key === 'i')) {
-                  e.preventDefault()
-                  wrapSelection(ta, e.key === 'b' ? '**' : '_')
-                  commit(ta.value)
-                }
-              }}
-            />
-          </div>
-        )}
-        {mode !== 'write' && (
-          <div className="scroll note-read" data-scroll>
-            {text.trim() ? <article className="prose" dangerouslySetInnerHTML={{ __html: html }} /> : <p className="viewer-empty">Nothing written yet.</p>}
-          </div>
-        )}
-      </div>
+        <button className={mark(editor.isActive('italic'))} onClick={() => editor.chain().focus().toggleItalic().run()} title="Italic (Ctrl I)">
+          <i>I</i>
+        </button>
+        <button className={mark(editor.isActive('underline'))} onClick={() => editor.chain().focus().toggleUnderline().run()} title="Underline (Ctrl U)">
+          <u>U</u>
+        </button>
+        <button className={mark(editor.isActive('strike'))} onClick={() => editor.chain().focus().toggleStrike().run()} title="Strikethrough">
+          <s>S</s>
+        </button>
+        <span className="format-sep" />
+        <button className={mark(editor.isActive('heading', { level: 2 }))} onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()} title="Heading">
+          H
+        </button>
+        <button className={mark(editor.isActive('bulletList'))} onClick={() => editor.chain().focus().toggleBulletList().run()} title="Bulleted list">
+          <Icon name="list" size={15} />
+        </button>
+        <button className={mark(editor.isActive('taskList'))} onClick={() => editor.chain().focus().toggleTaskList().run()} title="Checklist">
+          ☐
+        </button>
+        <button className={mark(editor.isActive('blockquote'))} onClick={() => editor.chain().focus().toggleBlockquote().run()} title="Quote">
+          <Icon name="quote" size={15} />
+        </button>
+      </BubbleMenu>
     </div>
   )
+}
+
+function download(blob: Blob, name: string) {
+  const a = document.createElement('a')
+  a.href = URL.createObjectURL(blob)
+  a.download = name
+  a.click()
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000)
 }

@@ -22,7 +22,7 @@ Studying usually means one app for the PDF, another for notes, a browser tab for
 - **Reads almost anything**: PDF, Word (`.docx`), PowerPoint (`.pptx`), Excel (`.xlsx`, `.xls`, `.ods`), CSV and TSV, EPUB, Markdown, Jupyter notebooks (`.ipynb`), OpenDocument text (`.odt`), RTF, HTML, plain text, images, and source code in about 50 languages.
 - **Two screens, one window**: `Ctrl Shift S` turns Stillpage into one full-screen window across every monitor, with the pane divider on the bezel. Press it again to go back.
 - **Split panes with tabs**: up to four side-by-side panes, each with its own tabs. Drag tabs between panes, resize the dividers, and drop files from your file manager straight into a pane.
-- **Notes beside the source**: Markdown notes that save as you type. Select a passage in any document and choose **Add to note** to quote it, page number included.
+- **Notes beside the source**: write the way you read. Type `# ` for a heading, `- ` for a list, `[ ] ` for a checklist or `**bold**`, and it turns into the real thing with no symbols left behind. Select text for a small formatting bar. Notes save as you type (as Markdown underneath) and export to PDF or Markdown. Select a passage in any document and choose **Add to note** to quote it, page number included.
 - **Zen mode** (`Ctrl .`): the chrome fades away and only the text remains. Move the pointer to the top edge to get the toolbar back.
 - **Typography you control**: Literata or Figtree, text size, line length and spacing. Four themes: Stone, Linen, Mist and Dusk, a soft dim theme that is not pitch black. PDF pages can take on the theme's paper tone.
 - **Spotify built in**: paste a playlist link into the small pill in the corner and it plays inside the app. With Premium you can also connect Spotify and control it on your phone or desktop.
@@ -93,12 +93,13 @@ Good to know:
 | `Alt N` | New note beside the current document |
 | `Ctrl \` | Split the workspace |
 | `Ctrl .` | Zen mode (`Esc` to leave) |
+| `Ctrl +`, `Ctrl -`, `Ctrl 0` | Bigger, smaller, default text. In a PDF, zoom. `Ctrl` + scroll works too |
 | `Ctrl Shift S` | Span all screens, or go back to one |
 | `F11` | Full screen |
 | `Alt W` | Close tab |
 | `Ctrl Tab` | Next tab in the pane |
 | `Alt 1`–`4` | Jump to a pane |
-| `Ctrl B`, `Ctrl I` | Bold, italic in notes |
+| `Ctrl B`, `Ctrl I`, `Ctrl U` | Bold, italic, underline in notes |
 | `Ctrl` + scroll | Zoom a PDF |
 
 ## Develop

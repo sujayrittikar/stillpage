@@ -22,5 +22,8 @@ contextBridge.exposeInMainWorld('stillpage', {
     ipcRenderer.on('span-changed', listener)
     return () => ipcRenderer.removeListener('span-changed', listener)
   },
+  exportPdf: (name, html) => ipcRenderer.invoke('export-pdf', name, html),
+  saveFile: (name, text) => ipcRenderer.invoke('save-file', name, text),
+  showInFolder: (file) => ipcRenderer.invoke('show-in-folder', file),
   openExternal: (url) => ipcRenderer.invoke('open-external', url),
 })

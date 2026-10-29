@@ -95,6 +95,9 @@ declare global {
       spanScreens: (on?: boolean) => Promise<{ spanned: boolean; seams: number[] }>
       screenInfo: () => Promise<{ count: number; spanned: boolean }>
       onSpanChanged: (cb: (spanned: boolean) => void) => () => void
+      exportPdf: (name: string, html: string) => Promise<string | null>
+      saveFile: (name: string, text: string) => Promise<string | null>
+      showInFolder: (file: string) => Promise<void>
       openExternal: (url: string) => Promise<void>
     }
   }

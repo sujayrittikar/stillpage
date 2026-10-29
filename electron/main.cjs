@@ -1,7 +1,7 @@
 // Stillpage — Electron main process.
 // Serves the built renderer over a privileged app:// scheme, handles "Open with"
 // from the file manager, and runs the Spotify login in a child window.
-const { app, BrowserWindow, Menu, ipcMain, net, protocol, screen, session, shell } = require('electron')
+const { app, BrowserWindow, Menu, dialog, ipcMain, net, protocol, screen, session, shell } = require('electron')
 const fs = require('node:fs')
 const { setFullscreenMonitors } = require('./x11.cjs')
 const path = require('node:path')
@@ -262,6 +262,82 @@ ipcMain.handle('spotify-web-logout', async () => {
       .map((c) => session.defaultSession.cookies.remove(`https://${c.domain.replace(/^\./, '')}${c.path}`, c.name)),
   )
   return false
+})
+
+// ---------- Exports ----------
+
+async function askWhereToSave(name, filters) {
+  const result = await dialog.showSaveDialog(win, {
+    defaultPath: path.join(app.getPath('documents'), String(name).replace(/[\\/]/g, '-')),
+    filters,
+  })
+  return result.canceled ? null : result.filePath
+}
+
+/** Literata from the built renderer, inlined so the PDF matches the app. */
+function exportFonts() {
+  try {
+    const assets = path.join(DIST, 'assets')
+    const files = fs.readdirSync(assets)
+    const face = (prefix, style) => {
+      const file = files.find((f) => f.startsWith(prefix) && f.endsWith('.woff2'))
+      if (!file) return ''
+      const data = fs.readFileSync(path.join(assets, file)).toString('base64')
+      return `@font-face{font-family:Literata;font-style:${style};font-weight:200 900;src:url(data:font/woff2;base64,${data}) format('woff2')}`
+    }
+    return face('literata-latin-standard-normal', 'normal') + face('literata-latin-standard-italic', 'italic')
+  } catch {
+    return ''
+  }
+}
+
+const EXPORT_CSS = `
+@page { size: A4; margin: 22mm 20mm; }
+body { font: 11.5pt/1.6 Literata, Georgia, serif; color: #23272b; }
+h1, h2, h3, h4 { line-height: 1.25; margin: 1.4em 0 .5em; font-weight: 600; }
+h1 { font-size: 21pt; } h2 { font-size: 16pt; } h3 { font-size: 13pt; }
+h1:first-child, h2:first-child, h3:first-child { margin-top: 0; }
+p, ul, ol, blockquote, pre { margin: 0 0 .8em; }
+li > p { margin: 0 0 .2em; }
+blockquote { margin-left: 0; padding-left: 1em; border-left: 2px solid #9aa7b4; color: #4a525a; font-style: italic; }
+code { font: 10pt 'IBM Plex Mono', monospace; background: #f1f2ef; padding: .1em .3em; border-radius: 3px; }
+pre { background: #f4f5f2; padding: .8em 1em; border-radius: 6px; white-space: pre-wrap; }
+pre code { background: none; padding: 0; }
+a { color: #3a5676; }
+hr { border: 0; border-top: 1px solid #d5d8d2; margin: 1.6em 0; }
+ul[data-type=taskList] { list-style: none; padding-left: .2em; }
+ul[data-type=taskList] li { display: flex; gap: .5em; }
+ul[data-type=taskList] li > label { flex: 0 0 auto; }
+ul[data-type=taskList] li > div > p { margin: 0; }
+img { max-width: 100%; }
+`
+
+async function exportPdf(name, html) {
+  const target = await askWhereToSave(name, [{ name: 'PDF', extensions: ['pdf'] }])
+  if (!target) return null
+  const page = new BrowserWindow({ show: false, webPreferences: { javascript: false, sandbox: true } })
+  try {
+    const doc = `<!doctype html><html><head><meta charset="utf-8"><style>${exportFonts()}${EXPORT_CSS}</style></head><body>${html}</body></html>`
+    await page.loadURL('data:text/html;charset=utf-8;base64,' + Buffer.from(doc).toString('base64'))
+    const pdf = await page.webContents.printToPDF({ pageSize: 'A4', printBackground: true, preferCSSPageSize: true })
+    fs.writeFileSync(target, pdf)
+    return target
+  } finally {
+    page.destroy()
+  }
+}
+
+ipcMain.handle('export-pdf', (_event, name, html) => (typeof html === 'string' ? exportPdf(name, html) : null))
+ipcMain.handle('save-file', async (_event, name, text) => {
+  if (typeof text !== 'string') return null
+  const ext = path.extname(String(name)).slice(1) || 'txt'
+  const target = await askWhereToSave(name, [{ name: ext.toUpperCase(), extensions: [ext] }])
+  if (!target) return null
+  fs.writeFileSync(target, text)
+  return target
+})
+ipcMain.handle('show-in-folder', (_event, file) => {
+  if (typeof file === 'string' && path.isAbsolute(file)) shell.showItemInFolder(file)
 })
 
 ipcMain.handle('take-pending-files', () => {

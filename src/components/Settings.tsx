@@ -12,12 +12,13 @@ const SHORTCUTS: [string, string][] = [
   ['Alt N', 'New note beside'],
   ['Ctrl \\', 'Split the workspace'],
   ['Ctrl .', 'Zen mode'],
+  ['Ctrl + / -', 'Bigger, smaller text (PDF: zoom)'],
   ['Ctrl Shift S', 'Span all screens'],
   ['F11', 'Full screen'],
   ['Alt W', 'Close tab'],
   ['Ctrl Tab', 'Next tab in pane'],
   ['Alt 1–4', 'Jump to pane'],
-  ['Ctrl B / I', 'Bold, italic in notes'],
+  ['Ctrl B / I / U', 'Bold, italic, underline in notes'],
 ]
 
 export function Settings({ prefs, set, onClose }: { prefs: Prefs; set: (p: Partial<Prefs>) => void; onClose: () => void }) {
@@ -45,7 +46,7 @@ export function Settings({ prefs, set, onClose }: { prefs: Prefs; set: (p: Parti
 
         <label className="range">
           <span>Text size</span>
-          <input type="range" min={15} max={26} step={1} value={prefs.fontSize} onChange={(e) => set({ fontSize: Number(e.target.value) })} />
+          <input type="range" min={13} max={36} step={1} value={prefs.fontSize} onChange={(e) => set({ fontSize: Number(e.target.value) })} />
           <output>{prefs.fontSize}</output>
         </label>
         <label className="range">

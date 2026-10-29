@@ -962,7 +962,9 @@ body.resizing .divider::after {
   padding: 28px 28px 120px;
   display: flex;
   flex-direction: column;
-  align-items: center;
+  /* "safe": once pages are wider than the pane, start them at the left edge
+     so the horizontal scrollbar can reach both sides. */
+  align-items: safe center;
   gap: 20px;
 }
 
@@ -1359,46 +1361,130 @@ body.resizing .divider::after {
   min-width: 0;
 }
 
-.mode-both .note-read {
-  border-left: 1px solid color-mix(in srgb, var(--line) 70%, transparent);
-}
-
-.mode-both .prose,
-.mode-both textarea {
-  padding-left: 28px;
-  padding-right: 28px;
-}
-
 .note-write {
+  flex: 1;
+  min-height: 0;
   cursor: text;
 }
 
-.note-write textarea {
-  display: block;
-  width: 100%;
-  max-width: var(--read-measure);
-  margin: 0 auto;
-  padding: 48px 36px 40vh;
-  border: 0;
-  outline: 0;
-  resize: none;
-  overflow: hidden;
-  background: transparent;
-  font-family: var(--read-font);
-  font-size: calc(var(--read-size) * 0.95);
-  line-height: var(--read-leading);
-  color: var(--ink);
+/* The editor is the reading column itself: what you write looks like what you read. */
+.note-prose {
+  padding-top: 40px;
+  outline: none;
   caret-color: var(--accent);
-  tab-size: 2;
 }
 
-.note-write textarea::placeholder {
+.note-prose p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: left;
+  height: 0;
+  pointer-events: none;
   color: var(--muted);
   font-style: italic;
 }
 
-.note-read .prose {
-  padding-top: 48px;
+.note-prose ul[data-type='taskList'] {
+  list-style: none;
+  padding-left: 0.1em;
+}
+
+.note-prose ul[data-type='taskList'] li {
+  display: flex;
+  align-items: baseline;
+  gap: 0.55em;
+}
+
+.note-prose ul[data-type='taskList'] li > label {
+  flex: 0 0 auto;
+  user-select: none;
+}
+
+.note-prose ul[data-type='taskList'] li > div {
+  flex: 1;
+  min-width: 0;
+}
+
+.note-prose ul[data-type='taskList'] li > div > p {
+  margin: 0;
+}
+
+.note-prose ul[data-type='taskList'] li[data-checked='true'] > div {
+  color: var(--muted);
+  text-decoration: line-through;
+  text-decoration-color: color-mix(in srgb, var(--muted) 60%, transparent);
+}
+
+.note-prose li > p {
+  margin: 0 0 0.3em;
+}
+
+.note-prose ::selection {
+  background: var(--accent-soft);
+}
+
+.export-anchor {
+  position: relative;
+}
+
+.export-menu {
+  top: 36px;
+  padding: 6px;
+  display: grid;
+  min-width: 190px;
+}
+
+.menu-item {
+  padding: 8px 12px;
+  border-radius: 8px;
+  text-align: left;
+  font-size: 13.5px;
+  color: var(--ink-2);
+  white-space: nowrap;
+}
+
+.menu-item:hover {
+  background: var(--surface-2);
+  color: var(--ink);
+}
+
+.format-bar {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px;
+  border-radius: 11px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  box-shadow: var(--lift);
+  font: 500 14px/1 var(--font-sans);
+}
+
+.format-bar button {
+  min-width: 30px;
+  height: 30px;
+  padding: 0 7px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 7px;
+  color: var(--ink-2);
+}
+
+.format-bar button:hover,
+.format-bar button.on {
+  background: var(--surface-2);
+  color: var(--accent);
+}
+
+.format-bar b {
+  font-weight: 700;
+}
+
+.format-sep {
+  width: 1px;
+  height: 18px;
+  margin: 0 3px;
+  background: var(--line);
 }
 
 /* ---------- Capture ---------- */
@@ -2218,4 +2304,47 @@ kbd {
   .slide {
     padding: 36px 22px 28px;
   }
+}
+
+/* ---------- Across screens ---------- */
+
+/* One title per pane, laid over the rail so each sits centred on its own
+   screen instead of on the bezel. */
+.rail {
+  position: relative;
+}
+
+.rail-titles {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  align-items: center;
+  pointer-events: none;
+}
+
+.app:not(.spanned) .rail-titles {
+  display: none;
+}
+
+.rail-titles .rail-title {
+  justify-self: center;
+  max-width: 46%;
+}
+
+.rail-titles .rail-title.focused {
+  color: var(--ink-2);
+}
+
+.app.spanned .rail-group:last-of-type {
+  margin-left: auto;
+}
+
+.app.spanned .toasts {
+  left: var(--focus-x);
+}
+
+.app.spanned .enso-moment {
+  right: auto;
+  left: var(--focus-x);
+  translate: -50% 0;
 }

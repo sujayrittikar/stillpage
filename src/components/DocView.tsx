@@ -81,7 +81,7 @@ export function DocView({ item, prefs }: { item: Item; prefs: Prefs }) {
     case 'pdf':
       body = (
         <Suspense fallback={<Loading />}>
-          <PdfViewer data={rendered.data} tint={prefs.pdfTint} />
+          <PdfViewer id={item.id} data={rendered.data} tint={prefs.pdfTint} />
         </Suspense>
       )
       break

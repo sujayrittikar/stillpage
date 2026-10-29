@@ -1,7 +1,7 @@
 import * as pdfjs from 'pdfjs-dist'
 import type { PDFDocumentProxy } from 'pdfjs-dist'
 import workerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
-import { useEffect, useRef, useState, type CSSProperties } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react'
 import { Icon } from '../Icon'
 
 pdfjs.GlobalWorkerOptions.workerSrc = workerUrl
@@ -9,7 +9,7 @@ const ASSETS = new URL('./pdfjs/', document.baseURI).href
 
 type Size = [number, number]
 
-export default function PdfViewer({ data, tint }: { data: ArrayBuffer; tint: boolean }) {
+export default function PdfViewer({ id, data, tint }: { id: string; data: ArrayBuffer; tint: boolean }) {
   const scrollRef = useRef<HTMLDivElement>(null)
   const [doc, setDoc] = useState<PDFDocumentProxy | null>(null)
   const [sizes, setSizes] = useState<Size[]>([])
@@ -70,9 +70,29 @@ export default function PdfViewer({ data, tint }: { data: ArrayBuffer; tint: boo
 
   const maxW = sizes.reduce((m, s) => Math.max(m, s[0]), 1)
   const scale = zoom === 'fit' ? clampZoom((width - 56) / maxW) : zoom
-  useEffect(() => {
+  // Keep the spot you were looking at in the middle while the pages grow or
+  // shrink, instead of drifting to the top-left.
+  const previousScale = useRef(scale)
+  useLayoutEffect(() => {
+    const el = scrollRef.current
+    const ratio = scale / previousScale.current
+    previousScale.current = scale
     currentScale.current = scale
+    if (!el || ratio === 1) return
+    el.scrollTop = (el.scrollTop + el.clientHeight / 2) * ratio - el.clientHeight / 2
+    el.scrollLeft = (el.scrollLeft + el.clientWidth / 2) * ratio - el.clientWidth / 2
   }, [scale])
+
+  useEffect(() => {
+    const onZoom = (e: Event) => {
+      const { id: target, dir } = (e as CustomEvent<{ id: string; dir: 1 | -1 | 0 }>).detail
+      if (target !== id) return
+      if (dir === 0) setZoom('fit')
+      else setZoom(clampZoom(currentScale.current * (dir > 0 ? 1.15 : 0.85)))
+    }
+    window.addEventListener('stillpage:pdf-zoom', onZoom)
+    return () => window.removeEventListener('stillpage:pdf-zoom', onZoom)
+  }, [id])
 
   const onScroll = () => {
     const el = scrollRef.current

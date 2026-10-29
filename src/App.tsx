@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react'
 import { Enso, Icon } from './components/Icon'
 import { FocusTimer } from './components/FocusTimer'
 import { Library } from './components/Library'
@@ -9,10 +9,12 @@ import { SpotifyDock } from './components/SpotifyDock'
 import { uid } from './lib/db'
 import { ACCEPT } from './lib/formats'
 import { appendToNote, createNote, getItem, importFiles, removeItem, touchItem, useItems } from './lib/library'
-import { loadLayout, saveLayout, usePrefs } from './lib/prefs'
+import { DEFAULT_PREFS, loadLayout, saveLayout, usePrefs } from './lib/prefs'
 import type { DesktopFile, Layout, Pane } from './lib/types'
 
 const MAX_PANES = 4
+const MIN_TEXT = 13
+const MAX_TEXT = 36
 const MIN_FRACTION = 0.14
 
 const freshLayout = (): Layout => ({ panes: [{ id: 'p1', tabs: [], active: null, size: 1 }], focused: 'p1' })
@@ -76,6 +78,24 @@ export default function App() {
     setToasts((t) => [...t, { id, text }])
     setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 3600)
   }, [])
+
+  useEffect(() => {
+    const onToast = (e: Event) => toast(String((e as CustomEvent).detail))
+    window.addEventListener('stillpage:toast', onToast)
+    return () => window.removeEventListener('stillpage:toast', onToast)
+  }, [toast])
+
+  // Ctrl + / Ctrl - / Ctrl 0 and Ctrl + wheel: a PDF zooms its pages, anything
+  // else (notes included) changes the text size everywhere, and it sticks.
+  const zoomText = useCallback(
+    (dir: 1 | -1 | 0) => {
+      const size = dir === 0 ? DEFAULT_PREFS.fontSize : Math.min(MAX_TEXT, Math.max(MIN_TEXT, prefs.fontSize + dir))
+      if (size === prefs.fontSize) return
+      setPrefs({ fontSize: size })
+      toast(`Text size ${Math.round((size / DEFAULT_PREFS.fontSize) * 100)}%`)
+    },
+    [prefs.fontSize, setPrefs, toast],
+  )
 
   const openItems = useCallback((ids: string[], paneId?: string) => {
     if (!ids.length) return
@@ -257,6 +277,13 @@ export default function App() {
       } else if (mod && e.key === '.') {
         e.preventDefault()
         toggleZen()
+      } else if (mod && !e.altKey && (e.key === '=' || e.key === '+' || e.key === '-' || e.key === '0')) {
+        e.preventDefault()
+        const dir = e.key === '-' ? -1 : e.key === '0' ? 0 : 1
+        const pane = layout.panes.find((p) => p.id === layout.focused)
+        const item = pane?.active ? items[pane.active] : undefined
+        if (item?.format === 'pdf') window.dispatchEvent(new CustomEvent('stillpage:pdf-zoom', { detail: { id: item.id, dir } }))
+        else zoomText(dir)
       } else if (mod && e.shiftKey && key === 's') {
         e.preventDefault()
         void toggleSpan()
@@ -293,7 +320,19 @@ export default function App() {
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [layout, newNote, split, toggleZen, toggleSpan, zen, settingsOpen, libraryOpen])
+  }, [layout, items, newNote, split, toggleZen, toggleSpan, zoomText, zen, settingsOpen, libraryOpen])
+
+  useEffect(() => {
+    const el = workspace.current
+    if (!el) return
+    const onWheel = (e: WheelEvent) => {
+      if (!e.ctrlKey || (e.target as Element).closest('.pdf-scroll')) return
+      e.preventDefault()
+      zoomText(e.deltaY < 0 ? 1 : -1)
+    }
+    el.addEventListener('wheel', onWheel, { passive: false })
+    return () => el.removeEventListener('wheel', onWheel)
+  }, [zoomText])
 
   // Stop stray file drops from navigating the window away.
   useEffect(() => {
@@ -308,9 +347,14 @@ export default function App() {
 
   const focusedPane = layout.panes.find((p) => p.id === layout.focused)
   const focusedTitle = focusedPane?.active ? items[focusedPane.active]?.title : null
+  // Across two screens one centred title would sit on the bezel, so each pane
+  // gets its own, and toasts follow the pane you're working in.
+  const paneEdges = layout.panes.reduce<number[]>((acc, p) => [...acc, (acc.at(-1) ?? 0) + p.size], [])
+  const focusedIndex = Math.max(0, layout.panes.findIndex((p) => p.id === layout.focused))
+  const focusX = ((paneEdges[focusedIndex] - layout.panes[focusedIndex].size / 2) * 100).toFixed(2) + '%'
 
   return (
-    <div className={`app ${zen ? 'zen' : ''}`}>
+    <div className={`app ${zen ? 'zen' : ''} ${screens.spanned ? 'spanned' : ''}`} style={{ '--focus-x': focusX } as CSSProperties}>
       <div className="rail-hotzone" />
       <header className="rail">
         <div className="brand">
@@ -331,7 +375,17 @@ export default function App() {
             <Icon name="split" />
           </button>
         </nav>
-        <p className="rail-title">{focusedTitle}</p>
+        {screens.spanned ? (
+          <div className="rail-titles" style={{ gridTemplateColumns: layout.panes.map((p) => `${p.size}fr`).join(' ') }}>
+            {layout.panes.map((p) => (
+              <p key={p.id} className={`rail-title ${p.id === layout.focused ? 'focused' : ''}`}>
+                {p.active ? items[p.active]?.title : null}
+              </p>
+            ))}
+          </div>
+        ) : (
+          <p className="rail-title">{focusedTitle}</p>
+        )}
         <nav className="rail-group">
           <FocusTimer onDone={(m) => toast(`${m} minutes of focus. Take a breath.`)} />
           <div className="settings-anchor">
