@@ -42,12 +42,12 @@ Studying usually means one app for the PDF, another for notes, a browser tab for
 
 ## Install
 
-Grab the latest build from [Releases](../../releases).
+Download the latest `.deb` or `.AppImage` from [Releases](https://github.com/sujayrittikar/stillpage/releases/latest).
 
-**Ubuntu, Debian, Mint, Pop!_OS** (recommended):
+**Ubuntu, Debian, Mint, Pop!_OS** (recommended). From the folder you downloaded it to:
 
 ```bash
-sudo apt install ./Stillpage-0.1.0-amd64.deb
+sudo apt install ./Stillpage-*-amd64.deb
 ```
 
 Stillpage then shows up in your app launcher, and "Open with Stillpage" appears in your file manager for PDFs, Office files, EPUBs and Markdown.
@@ -55,8 +55,8 @@ Stillpage then shows up in your app launcher, and "Open with Stillpage" appears 
 **Any other distro**: use the AppImage.
 
 ```bash
-chmod +x Stillpage-0.1.0-x86_64.AppImage
-./Stillpage-0.1.0-x86_64.AppImage
+chmod +x Stillpage-*-x86_64.AppImage
+./Stillpage-*-x86_64.AppImage
 ```
 
 > On Ubuntu 24.04 and newer, AppArmor blocks the Chromium sandbox for AppImages. If the AppImage exits straight away, run it with `--no-sandbox`, or use the `.deb`, which installs the right AppArmor profile for you.
