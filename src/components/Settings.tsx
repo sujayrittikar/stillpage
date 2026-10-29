@@ -12,6 +12,7 @@ const SHORTCUTS: [string, string][] = [
   ['Alt N', 'New note beside'],
   ['Ctrl \\', 'Split the workspace'],
   ['Ctrl .', 'Zen mode'],
+  ['Ctrl Shift S', 'Span all screens'],
   ['F11', 'Full screen'],
   ['Alt W', 'Close tab'],
   ['Ctrl Tab', 'Next tab in pane'],

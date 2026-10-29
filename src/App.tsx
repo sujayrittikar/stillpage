@@ -51,6 +51,7 @@ export default function App() {
   const [ensoMoment, setEnsoMoment] = useState(false)
   const [libraryOpen, setLibraryOpen] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [screens, setScreens] = useState({ count: 1, spanned: false })
   const [toasts, setToasts] = useState<Toast[]>([])
   const fileInput = useRef<HTMLInputElement>(null)
   const workspace = useRef<HTMLDivElement>(null)
@@ -127,6 +128,36 @@ export default function App() {
     void bridge.takePendingFiles().then(take)
     return bridge.onOpenFiles(take)
   }, [handleFiles])
+
+  // Spanning monitors. GNOME's maximize stops at one screen, so the main
+  // process stretches the window over all of them instead.
+  useEffect(() => {
+    const bridge = window.stillpage
+    if (!bridge?.screenInfo) return
+    const refresh = () => void bridge.screenInfo().then(setScreens)
+    refresh()
+    window.addEventListener('focus', refresh)
+    const off = bridge.onSpanChanged((spanned) => setScreens((s) => ({ ...s, spanned })))
+    return () => {
+      window.removeEventListener('focus', refresh)
+      off()
+    }
+  }, [])
+
+  const toggleSpan = useCallback(async () => {
+    const bridge = window.stillpage
+    if (!bridge?.spanScreens) return
+    const { spanned, seams } = await bridge.spanScreens(!screens.spanned)
+    setScreens((s) => ({ ...s, spanned }))
+    if (!spanned || seams.length !== 1) return
+    // Put the pane divider on the bezel: one document per screen.
+    const [seam] = seams
+    setLayout((l) => {
+      if (l.panes.length > 2) return l
+      const second = l.panes[1] ?? { id: uid(), tabs: [], active: null, size: 0 }
+      return { ...l, panes: [{ ...l.panes[0], size: seam }, { ...second, size: 1 - seam }] }
+    })
+  }, [screens.spanned])
 
   const pickFiles = (paneId?: string) => {
     openTarget.current = paneId ?? null
@@ -226,6 +257,9 @@ export default function App() {
       } else if (mod && e.key === '.') {
         e.preventDefault()
         toggleZen()
+      } else if (mod && e.shiftKey && key === 's') {
+        e.preventDefault()
+        void toggleSpan()
       } else if (e.key === 'F11') {
         e.preventDefault()
         if (document.fullscreenElement) void document.exitFullscreen()
@@ -259,7 +293,7 @@ export default function App() {
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [layout, newNote, split, toggleZen, zen, settingsOpen, libraryOpen])
+  }, [layout, newNote, split, toggleZen, toggleSpan, zen, settingsOpen, libraryOpen])
 
   // Stop stray file drops from navigating the window away.
   useEffect(() => {
@@ -306,6 +340,11 @@ export default function App() {
             </button>
             {settingsOpen && <Settings prefs={prefs} set={setPrefs} onClose={() => setSettingsOpen(false)} />}
           </div>
+          {(screens.count > 1 || screens.spanned) && (
+            <button className={`rail-btn ${screens.spanned ? 'on' : ''}`} onClick={() => void toggleSpan()} title={screens.spanned ? 'Back to one screen (Ctrl Shift S)' : 'Span all screens (Ctrl Shift S)'}>
+              <Icon name="screens" />
+            </button>
+          )}
           <button
             className="rail-btn"
             onClick={() => (document.fullscreenElement ? void document.exitFullscreen() : void document.documentElement.requestFullscreen())}

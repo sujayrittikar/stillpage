@@ -86,7 +86,15 @@ declare global {
       takePendingFiles: () => Promise<DesktopFile[]>
       onOpenFiles: (cb: (files: DesktopFile[]) => void) => () => void
       spotifyAuth: (url: string) => Promise<string | null>
+      spotifyWeb: {
+        status: () => Promise<boolean>
+        login: () => Promise<boolean>
+        logout: () => Promise<boolean>
+      }
       drmStatus: () => Promise<'ready' | 'unavailable'>
+      spanScreens: (on?: boolean) => Promise<{ spanned: boolean; seams: number[] }>
+      screenInfo: () => Promise<{ count: number; spanned: boolean }>
+      onSpanChanged: (cb: (spanned: boolean) => void) => () => void
       openExternal: (url: string) => Promise<void>
     }
   }

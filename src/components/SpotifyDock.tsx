@@ -51,8 +51,28 @@ export function SpotifyDock({ zen }: { zen: boolean }) {
   const [clientId, setClientIdDraft] = useState(getClientId())
   const [embed, setEmbed] = useState<string | null>(() => localStorage.getItem(EMBED_KEY))
   const [embedDraft, setEmbedDraft] = useState('')
+  const [webSignedIn, setWebSignedIn] = useState<boolean | null>(null)
+  const [embedKey, setEmbedKey] = useState(0)
   const [, tick] = useState(0)
   const volumeTimer = useRef<number | undefined>(undefined)
+
+  const web = window.stillpage?.spotifyWeb
+  useEffect(() => {
+    if (open && web) void web.status().then(setWebSignedIn)
+  }, [open, web])
+
+  const signInWeb = async () => {
+    if (!web) return
+    const ok = await web.login()
+    setWebSignedIn(ok)
+    if (ok) setEmbedKey((k) => k + 1)
+  }
+
+  const signOutWeb = async () => {
+    if (!web) return
+    setWebSignedIn(await web.logout())
+    setEmbedKey((k) => k + 1)
+  }
 
   const fail = useCallback((err: unknown) => {
     if (err instanceof SpotifyError && err.status === 401) {
@@ -237,13 +257,59 @@ export function SpotifyDock({ zen }: { zen: boolean }) {
         ) : (
           <>
             <p className="dock-title">Music without leaving the page</p>
+            <form
+              className="inline-form"
+              onSubmit={(e) => {
+                e.preventDefault()
+                const url = toEmbed(embedDraft)
+                if (!url) return setMessage('Paste a Spotify playlist, album or track link.')
+                setMessage(null)
+                setEmbed(url)
+                setEmbedDraft('')
+                localStorage.setItem(EMBED_KEY, url)
+              }}
+            >
+              <input value={embedDraft} onChange={(e) => setEmbedDraft(e.target.value)} placeholder="Paste a Spotify playlist link" spellCheck={false} />
+              <button className="btn small">Play</button>
+            </form>
+            {message && <p className="dock-msg">{message}</p>}
+            {embed && (
+              <>
+                <iframe key={embedKey} className="embed" src={embed} title="Spotify player" allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" loading="lazy" />
+                {web && webSignedIn === false && (
+                  <div className="dock-row">
+                    <p className="dock-hint">You hear 30-second previews until you sign in.</p>
+                    <button className="btn small spotify" onClick={() => void signInWeb()}>
+                      Sign in for full songs
+                    </button>
+                  </div>
+                )}
+                <div className="dock-row">
+                  <button
+                    className="link-btn"
+                    onClick={() => {
+                      setEmbed(null)
+                      localStorage.removeItem(EMBED_KEY)
+                    }}
+                  >
+                    Remove player
+                  </button>
+                  {web && webSignedIn && (
+                    <button className="link-btn" onClick={() => void signOutWeb()}>
+                      Sign out of Spotify
+                    </button>
+                  )}
+                </div>
+              </>
+            )}
+            {!embed && <p className="dock-hint">In Spotify, open a playlist, choose Share, then Copy link to playlist.</p>}
             {getClientId() && (
               <button className="btn spotify" onClick={connect}>
                 Connect Spotify
               </button>
             )}
-            <details className="setup" open={!getClientId()}>
-              <summary>Set up Spotify</summary>
+            <details className="setup">
+              <summary>Control Spotify with Premium (optional)</summary>
               <ol>
                 <li>
                   Create an app at{' '}
@@ -264,39 +330,8 @@ export function SpotifyDock({ zen }: { zen: boolean }) {
                   Connect
                 </button>
               </div>
-              <p className="dock-hint">Controlling playback needs Spotify Premium. Nothing leaves this computer except calls to Spotify.</p>
+              <p className="dock-hint">Nothing leaves this computer except calls to Spotify.</p>
             </details>
-            <p className="dock-or">Or play a public link without signing in</p>
-            <form
-              className="inline-form"
-              onSubmit={(e) => {
-                e.preventDefault()
-                const url = toEmbed(embedDraft)
-                if (!url) return setMessage('Paste a Spotify playlist, album or track link.')
-                setMessage(null)
-                setEmbed(url)
-                setEmbedDraft('')
-                localStorage.setItem(EMBED_KEY, url)
-              }}
-            >
-              <input value={embedDraft} onChange={(e) => setEmbedDraft(e.target.value)} placeholder="open.spotify.com/playlist/…" spellCheck={false} />
-              <button className="btn small quiet">Play</button>
-            </form>
-            {message && <p className="dock-msg">{message}</p>}
-            {embed && (
-              <>
-                <iframe className="embed" src={embed} title="Spotify player" allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" loading="lazy" />
-                <button
-                  className="link-btn"
-                  onClick={() => {
-                    setEmbed(null)
-                    localStorage.removeItem(EMBED_KEY)
-                  }}
-                >
-                  Remove player
-                </button>
-              </>
-            )}
           </>
         )}
       </div>

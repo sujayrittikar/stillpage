@@ -20,6 +20,13 @@ const PATHS: Record<string, ReactNode> = {
   trash: <><path d="M5 7h14M10 7V5h4v2M7 7l.8 12h8.4L17 7" /></>,
   download: <><path d="M12 4v11m-4-4 4 4 4-4M5 19.5h14" /></>,
   search: <><circle cx="11" cy="11" r="6" /><path d="m15.5 15.5 4 4" /></>,
+  screens: (
+    <>
+      <rect x="2.5" y="5" width="8.5" height="11" rx="1.5" />
+      <rect x="13" y="5" width="8.5" height="11" rx="1.5" />
+      <path d="M6.75 19.5h10.5" />
+    </>
+  ),
   fullscreen: <path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5" />,
   read: <><path d="M3.5 6.5c3-1.2 5.8-1.2 8.5 1 2.7-2.2 5.5-2.2 8.5-1v12c-3-1.2-5.8-1.2-8.5 1-2.7-2.2-5.5-2.2-8.5-1z" /><path d="M12 7.5v12" /></>,
   write: <><path d="M4 7h16M4 12h10M4 17h7" /></>,

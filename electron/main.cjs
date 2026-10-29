@@ -1,7 +1,7 @@
 // Stillpage — Electron main process.
 // Serves the built renderer over a privileged app:// scheme, handles "Open with"
 // from the file manager, and runs the Spotify login in a child window.
-const { app, BrowserWindow, Menu, ipcMain, net, protocol, shell } = require('electron')
+const { app, BrowserWindow, Menu, ipcMain, net, protocol, screen, session, shell } = require('electron')
 const fs = require('node:fs')
 const path = require('node:path')
 const { pathToFileURL } = require('node:url')
@@ -23,6 +23,13 @@ const CSP = [
   "object-src 'none'",
   "base-uri 'none'",
 ].join('; ')
+
+// GNOME and KDE on Wayland never let an app place or size its own window
+// across monitors, so "Span screens" could not work there. XWayland can, and
+// at 100% scaling it looks the same. Set STILLPAGE_WAYLAND=1 to opt out.
+if (process.platform === 'linux' && process.env.XDG_SESSION_TYPE === 'wayland' && !process.env.STILLPAGE_WAYLAND) {
+  app.commandLine.appendSwitch('ozone-platform', 'x11')
+}
 
 protocol.registerSchemesAsPrivileged([
   { scheme: 'app', privileges: { standard: true, secure: true, supportFetchAPI: true, stream: true, codeCache: true } },
@@ -64,6 +71,73 @@ function openPaths(paths) {
   else pendingPaths.push(...paths)
 }
 
+const STATE_FILE = () => path.join(app.getPath('userData'), 'window-state.json')
+/** Bounds to return to when the window stops spanning. */
+let restoreBounds = null
+
+function readState() {
+  try {
+    return JSON.parse(fs.readFileSync(STATE_FILE(), 'utf8'))
+  } catch {
+    return {}
+  }
+}
+
+function writeState(patch) {
+  try {
+    fs.writeFileSync(STATE_FILE(), JSON.stringify({ ...readState(), ...patch }))
+  } catch {}
+}
+
+/** The rectangle covering every monitor's usable area, left to right. */
+function allScreens() {
+  const areas = screen.getAllDisplays().map((d) => d.workArea)
+  const left = Math.min(...areas.map((a) => a.x))
+  const top = Math.max(...areas.map((a) => a.y))
+  const right = Math.max(...areas.map((a) => a.x + a.width))
+  const bottom = Math.min(...areas.map((a) => a.y + a.height))
+  return { bounds: { x: left, y: top, width: right - left, height: Math.max(420, bottom - top) }, areas }
+}
+
+function isSpanned() {
+  return restoreBounds !== null
+}
+
+/** Stretch the window over all monitors, or put it back. Returns where the
+ *  monitor edges fall, as fractions of the window width, so panes can line up. */
+function setSpanned(on) {
+  if (!win) return { spanned: false, seams: [] }
+  const displays = screen.getAllDisplays()
+  if (on && displays.length > 1) {
+    if (!isSpanned()) restoreBounds = win.isMaximized() || win.isFullScreen() ? null : win.getBounds()
+    restoreBounds ??= { width: 1440, height: 920 }
+    if (win.isFullScreen()) win.setFullScreen(false)
+    if (win.isMaximized()) win.unmaximize()
+    const { bounds, areas } = allScreens()
+    win.setBounds(bounds)
+    writeState({ spanned: true })
+    const seams = areas
+      .map((a) => a.x + a.width)
+      .filter((edge) => edge < bounds.x + bounds.width)
+      .sort((a, b) => a - b)
+      .map((edge) => (edge - bounds.x) / bounds.width)
+    return { spanned: true, seams }
+  }
+  if (isSpanned()) {
+    const back = restoreBounds
+    restoreBounds = null
+    if (back.x === undefined) win.setBounds({ ...back, ...centre(back) })
+    else win.setBounds(back)
+  }
+  writeState({ spanned: false })
+  return { spanned: false, seams: [] }
+}
+
+function centre({ width, height }) {
+  const area = screen.getDisplayNearestPoint(screen.getCursorScreenPoint()).workArea
+  return { x: area.x + Math.round((area.width - width) / 2), y: area.y + Math.round((area.height - height) / 2) }
+}
+
 function createWindow() {
   win = new BrowserWindow({
     width: 1440,
@@ -102,10 +176,21 @@ function createWindow() {
   })
   win.on('closed', () => {
     win = null
+    restoreBounds = null
     rendererReady = false
   })
 
   win.loadURL(DEV_URL || 'app://stillpage/index.html')
+  if (readState().spanned) {
+    win.once('ready-to-show', () => win?.webContents.send('span-changed', setSpanned(true).spanned))
+  }
+  // Maximizing from the title bar means the person chose one screen again.
+  win.on('maximize', () => {
+    if (!isSpanned()) return
+    restoreBounds = null
+    writeState({ spanned: false })
+    win?.webContents.send('span-changed', false)
+  })
 }
 
 function spotifyLogin(authorizeUrl) {
@@ -139,6 +224,58 @@ function spotifyLogin(authorizeUrl) {
   })
 }
 
+// Signing in to open.spotify.com in the app's own session lets the pasted-link
+// player play whole songs instead of 30-second previews. No developer app needed.
+const SPOTIFY_WEB_LOGIN = 'https://accounts.spotify.com/login?continue=' + encodeURIComponent('https://open.spotify.com/')
+
+async function spotifyWebSignedIn() {
+  const cookies = await session.defaultSession.cookies.get({ name: 'sp_dc' })
+  return cookies.some((c) => c.domain?.endsWith('spotify.com'))
+}
+
+function spotifyWebLogin() {
+  return new Promise((resolve) => {
+    let settled = false
+    const login = new BrowserWindow({
+      parent: win ?? undefined,
+      modal: true,
+      width: 480,
+      height: 720,
+      title: 'Sign in to Spotify',
+      autoHideMenuBar: true,
+      webPreferences: { contextIsolation: true, sandbox: true },
+    })
+    const finish = async () => {
+      if (settled) return
+      settled = true
+      if (!login.isDestroyed()) login.close()
+      resolve(await spotifyWebSignedIn())
+    }
+    // Once Spotify sends the window on to the web player, the sign-in is done.
+    login.webContents.on('did-navigate', (_event, url) => {
+      if (url.startsWith('https://open.spotify.com')) void finish()
+    })
+    login.webContents.setWindowOpenHandler(({ url }) => {
+      if (/^https?:\/\//.test(url)) shell.openExternal(url)
+      return { action: 'deny' }
+    })
+    login.on('closed', () => void finish())
+    login.loadURL(SPOTIFY_WEB_LOGIN)
+  })
+}
+
+ipcMain.handle('spotify-web-status', () => spotifyWebSignedIn())
+ipcMain.handle('spotify-web-login', () => spotifyWebLogin())
+ipcMain.handle('spotify-web-logout', async () => {
+  const cookies = await session.defaultSession.cookies.get({})
+  await Promise.all(
+    cookies
+      .filter((c) => c.domain?.replace(/^\./, '').endsWith('spotify.com'))
+      .map((c) => session.defaultSession.cookies.remove(`https://${c.domain.replace(/^\./, '')}${c.path}`, c.name)),
+  )
+  return false
+})
+
 ipcMain.handle('take-pending-files', () => {
   rendererReady = true
   const paths = pendingPaths
@@ -159,6 +296,8 @@ ipcMain.handle('drm-status', async () => {
     return 'unavailable'
   }
 })
+ipcMain.handle('span-screens', (_event, on) => setSpanned(on === undefined ? !isSpanned() : Boolean(on)))
+ipcMain.handle('screen-info', () => ({ count: screen.getAllDisplays().length, spanned: isSpanned() }))
 ipcMain.handle('open-external', (_event, url) => {
   if (typeof url === 'string' && /^https:\/\//.test(url)) shell.openExternal(url)
 })
@@ -194,6 +333,15 @@ app.whenReady().then(async () => {
   } catch (err) {
     console.warn('Widevine unavailable:', err?.message ?? err)
   }
+
+  // A monitor unplugged while spanning would leave the window hanging off
+  // into nothing; fall back to one screen.
+  screen.on('display-removed', () => {
+    if (isSpanned() && screen.getAllDisplays().length < 2) {
+      setSpanned(false)
+      win?.webContents.send('span-changed', false)
+    }
+  })
 
   pendingPaths.push(...filesFromArgv(process.argv))
   createWindow()

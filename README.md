@@ -20,11 +20,12 @@ Studying usually means one app for the PDF, another for notes, a browser tab for
 ## What it does
 
 - **Reads almost anything**: PDF, Word (`.docx`), PowerPoint (`.pptx`), Excel (`.xlsx`, `.xls`, `.ods`), CSV and TSV, EPUB, Markdown, Jupyter notebooks (`.ipynb`), OpenDocument text (`.odt`), RTF, HTML, plain text, images, and source code in about 50 languages.
-- **Split panes with tabs**: up to four side-by-side panes, each with its own tabs. Drag tabs between panes, resize the dividers, and drop files from your file manager straight into a pane. Maximise the window across two screens and you get a reader on one and a notebook on the other.
+- **Two screens, one window**: `Ctrl Shift S` stretches Stillpage over every monitor and puts the pane divider on the bezel.
+- **Split panes with tabs**: up to four side-by-side panes, each with its own tabs. Drag tabs between panes, resize the dividers, and drop files from your file manager straight into a pane. Press `Ctrl Shift S` (or the two-screens button) to stretch the window over both monitors: the divider lands on the bezel, so you get a reader on one screen and a notebook on the other.
 - **Notes beside the source**: Markdown notes that save as you type. Select a passage in any document and choose **Add to note** to quote it, page number included.
 - **Zen mode** (`Ctrl .`): the chrome fades away and only the text remains. Move the pointer to the top edge to get the toolbar back.
 - **Typography you control**: Literata or Figtree, text size, line length and spacing. Four themes: Stone, Linen, Mist and Dusk, a soft dim theme that is not pitch black. PDF pages can take on the theme's paper tone.
-- **Spotify built in**: sign in once, then pick a playlist and control playback from a small pill in the corner. Stillpage can be the speaker itself, or it can control Spotify on your phone or desktop. Without an account you can paste any public playlist link instead.
+- **Spotify built in**: paste a playlist link into the small pill in the corner and it plays inside the app. With Premium you can also connect Spotify and control it on your phone or desktop.
 - **Focus timer**: 15, 25, 50 or 90 minutes, ending with a soft chime.
 - **Private by design**: everything stays on your computer. No accounts, no telemetry. The only network calls go to Spotify, and only if you connect it.
 
@@ -60,18 +61,26 @@ chmod +x Stillpage-0.1.0-x86_64.AppImage
 
 > On Ubuntu 24.04 and newer, AppArmor blocks the Chromium sandbox for AppImages. If the AppImage exits straight away, run it with `--no-sandbox`, or use the `.deb`, which installs the right AppArmor profile for you.
 
-## Connecting Spotify
+## Music
 
-Spotify requires every app to have its own Client ID. It takes about two minutes:
+The quickest way needs no setup:
+
+1. In Spotify, open a playlist and choose **Share → Copy link to playlist**.
+2. In Stillpage, open the music pill (bottom right), paste the link and choose **Play**.
+3. Choose **Sign in for full songs** once. Until you do, Spotify plays 30-second previews.
+
+### Controlling Spotify with Premium (optional)
+
+To see what's playing, pick from your playlists and control Spotify on your phone or desktop, connect a Spotify developer app. Spotify requires every app to have its own Client ID. It takes about two minutes:
 
 1. Open the [Spotify developer dashboard](https://developer.spotify.com/dashboard) and create an app.
 2. Add the redirect URI `http://127.0.0.1:43117/callback`.
 3. Tick **Web API** and **Web Playback SDK**.
-4. In Stillpage, open the music pill (bottom right), paste the Client ID and choose **Connect**.
+4. In Stillpage, open the music pill, expand **Control Spotify with Premium**, paste the Client ID and choose **Connect**.
 
 Good to know:
 
-- Spotify only allows playback control for **Premium** accounts. On a free account you can still paste a playlist link and play it through the embedded player.
+- Spotify only allows playback control for **Premium** accounts. Pasted links work on any account.
 - New Spotify apps start in development mode, which is limited to the accounts you add under *User Management* in the dashboard.
 - Stillpage uses the PKCE flow, so there is no client secret. Tokens are stored locally and nowhere else.
 - Release builds use [castlabs Electron](https://github.com/castlabs/electron-releases), which includes the Widevine module Spotify needs to stream audio. If Widevine is unavailable, Stillpage falls back to controlling another Spotify device.
@@ -84,6 +93,7 @@ Good to know:
 | `Alt N` | New note beside the current document |
 | `Ctrl \` | Split the workspace |
 | `Ctrl .` | Zen mode (`Esc` to leave) |
+| `Ctrl Shift S` | Span all screens, or go back to one |
 | `F11` | Full screen |
 | `Alt W` | Close tab |
 | `Ctrl Tab` | Next tab in the pane |
