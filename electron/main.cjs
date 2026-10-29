@@ -3,6 +3,7 @@
 // from the file manager, and runs the Spotify login in a child window.
 const { app, BrowserWindow, Menu, ipcMain, net, protocol, screen, session, shell } = require('electron')
 const fs = require('node:fs')
+const { setFullscreenMonitors } = require('./x11.cjs')
 const path = require('node:path')
 const { pathToFileURL } = require('node:url')
 
@@ -24,12 +25,15 @@ const CSP = [
   "base-uri 'none'",
 ].join('; ')
 
-// GNOME and KDE on Wayland never let an app place or size its own window
-// across monitors, so "Span screens" could not work there. XWayland can, and
-// at 100% scaling it looks the same. Set STILLPAGE_WAYLAND=1 to opt out.
-if (process.platform === 'linux' && process.env.XDG_SESSION_TYPE === 'wayland' && !process.env.STILLPAGE_WAYLAND) {
-  app.commandLine.appendSwitch('ozone-platform', 'x11')
-}
+// Spanning monitors uses an X11 window-manager hint (see x11.cjs). On Wayland
+// sessions the desktop launcher starts Stillpage under XWayland with
+// --ozone-platform=x11. Electron reads that flag before this file runs, and
+// switching any later breaks the GPU process, so without it we stay on
+// Wayland and simply don't offer spanning.
+const CAN_SPAN =
+  process.platform === 'linux' &&
+  Boolean(process.env.DISPLAY) &&
+  (process.env.XDG_SESSION_TYPE !== 'wayland' || app.commandLine.getSwitchValue('ozone-platform') === 'x11')
 
 protocol.registerSchemesAsPrivileged([
   { scheme: 'app', privileges: { standard: true, secure: true, supportFetchAPI: true, stream: true, codeCache: true } },
@@ -72,8 +76,7 @@ function openPaths(paths) {
 }
 
 const STATE_FILE = () => path.join(app.getPath('userData'), 'window-state.json')
-/** Bounds to return to when the window stops spanning. */
-let restoreBounds = null
+let spanned = false
 
 function readState() {
   try {
@@ -89,53 +92,38 @@ function writeState(patch) {
   } catch {}
 }
 
-/** The rectangle covering every monitor's usable area, left to right. */
-function allScreens() {
-  const areas = screen.getAllDisplays().map((d) => d.workArea)
-  const left = Math.min(...areas.map((a) => a.x))
-  const top = Math.max(...areas.map((a) => a.y))
-  const right = Math.max(...areas.map((a) => a.x + a.width))
-  const bottom = Math.min(...areas.map((a) => a.y + a.height))
-  return { bounds: { x: left, y: top, width: right - left, height: Math.max(420, bottom - top) }, areas }
-}
-
-function isSpanned() {
-  return restoreBounds !== null
-}
-
-/** Stretch the window over all monitors, or put it back. Returns where the
- *  monitor edges fall, as fractions of the window width, so panes can line up. */
-function setSpanned(on) {
+/** Fullscreen over every monitor, or back to a normal window. Window managers
+ *  keep ordinary windows on one monitor, so spanning is a special fullscreen.
+ *  Returns where the monitor edges fall, as fractions of the window width,
+ *  so panes can line up with the bezels. */
+async function setSpanned(on) {
   if (!win) return { spanned: false, seams: [] }
-  const displays = screen.getAllDisplays()
-  if (on && displays.length > 1) {
-    if (!isSpanned()) restoreBounds = win.isMaximized() || win.isFullScreen() ? null : win.getBounds()
-    restoreBounds ??= { width: 1440, height: 920 }
-    if (win.isFullScreen()) win.setFullScreen(false)
-    if (win.isMaximized()) win.unmaximize()
-    const { bounds, areas } = allScreens()
-    win.setBounds(bounds)
-    writeState({ spanned: true })
-    const seams = areas
-      .map((a) => a.x + a.width)
-      .filter((edge) => edge < bounds.x + bounds.width)
-      .sort((a, b) => a - b)
-      .map((edge) => (edge - bounds.x) / bounds.width)
-    return { spanned: true, seams }
+  if (on && CAN_SPAN && screen.getAllDisplays().length > 1) {
+    try {
+      const id = win.getNativeWindowHandle().readUInt32LE(0)
+      const monitors = await setFullscreenMonitors(id)
+      spanned = true
+      win.setFullScreen(true)
+      writeState({ spanned: true })
+      const left = Math.min(...monitors.map((m) => m.x))
+      const width = Math.max(...monitors.map((m) => m.x + m.width)) - left
+      const seams = [...new Set(monitors.map((m) => m.x + m.width))]
+        .filter((edge) => edge < left + width)
+        .sort((a, b) => a - b)
+        .map((edge) => (edge - left) / width)
+      return { spanned: true, seams }
+    } catch (err) {
+      console.warn('Could not span screens:', err?.message ?? err)
+      spanned = false
+      return { spanned: false, seams: [] }
+    }
   }
-  if (isSpanned()) {
-    const back = restoreBounds
-    restoreBounds = null
-    if (back.x === undefined) win.setBounds({ ...back, ...centre(back) })
-    else win.setBounds(back)
+  if (spanned) {
+    spanned = false
+    win.setFullScreen(false)
   }
   writeState({ spanned: false })
   return { spanned: false, seams: [] }
-}
-
-function centre({ width, height }) {
-  const area = screen.getDisplayNearestPoint(screen.getCursorScreenPoint()).workArea
-  return { x: area.x + Math.round((area.width - width) / 2), y: area.y + Math.round((area.height - height) / 2) }
 }
 
 function createWindow() {
@@ -176,18 +164,18 @@ function createWindow() {
   })
   win.on('closed', () => {
     win = null
-    restoreBounds = null
+    spanned = false
     rendererReady = false
   })
 
   win.loadURL(DEV_URL || 'app://stillpage/index.html')
   if (readState().spanned) {
-    win.once('ready-to-show', () => win?.webContents.send('span-changed', setSpanned(true).spanned))
+    win.once('ready-to-show', async () => win?.webContents.send('span-changed', (await setSpanned(true)).spanned))
   }
-  // Maximizing from the title bar means the person chose one screen again.
-  win.on('maximize', () => {
-    if (!isSpanned()) return
-    restoreBounds = null
+  // Leaving fullscreen any other way (Esc, F11, the window manager) ends spanning.
+  win.on('leave-full-screen', () => {
+    if (!spanned) return
+    spanned = false
     writeState({ spanned: false })
     win?.webContents.send('span-changed', false)
   })
@@ -296,8 +284,8 @@ ipcMain.handle('drm-status', async () => {
     return 'unavailable'
   }
 })
-ipcMain.handle('span-screens', (_event, on) => setSpanned(on === undefined ? !isSpanned() : Boolean(on)))
-ipcMain.handle('screen-info', () => ({ count: screen.getAllDisplays().length, spanned: isSpanned() }))
+ipcMain.handle('span-screens', (_event, on) => setSpanned(on === undefined ? !spanned : Boolean(on)))
+ipcMain.handle('screen-info', () => ({ count: CAN_SPAN ? screen.getAllDisplays().length : 1, spanned }))
 ipcMain.handle('open-external', (_event, url) => {
   if (typeof url === 'string' && /^https:\/\//.test(url)) shell.openExternal(url)
 })
@@ -337,9 +325,8 @@ app.whenReady().then(async () => {
   // A monitor unplugged while spanning would leave the window hanging off
   // into nothing; fall back to one screen.
   screen.on('display-removed', () => {
-    if (isSpanned() && screen.getAllDisplays().length < 2) {
-      setSpanned(false)
-      win?.webContents.send('span-changed', false)
+    if (spanned && screen.getAllDisplays().length < 2) {
+      void setSpanned(false).then(() => win?.webContents.send('span-changed', false))
     }
   })
 

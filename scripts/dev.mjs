@@ -11,7 +11,8 @@ console.log(`\n  Renderer on ${url}\n`)
 // binaries; the installed .deb sets the sandbox up properly.
 const electron = spawn(
   process.platform === 'win32' ? 'npx.cmd' : 'npx',
-  ['electron', '.', '--no-sandbox', ...process.argv.slice(2)],
+  // Same flag the desktop launcher passes, so spanning works on Wayland too.
+  ['electron', '.', '--no-sandbox', ...(process.env.XDG_SESSION_TYPE === 'wayland' ? ['--ozone-platform=x11'] : []), ...process.argv.slice(2)],
   { stdio: 'inherit', env: { ...process.env, STILLPAGE_DEV_URL: url } },
 )
 electron.on('exit', async (code) => {

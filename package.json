@@ -1,6 +1,6 @@
 {
   "name": "stillpage",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "type": "module",
   "scripts": {
     "assets": "node scripts/copy-pdf-assets.mjs",
@@ -138,7 +138,10 @@
       },
       "executableName": "stillpage",
       "artifactName": "${productName}-${version}-${arch}.${ext}",
-      "syncDesktopName": true
+      "syncDesktopName": true,
+      "executableArgs": [
+        "--ozone-platform=x11"
+      ]
     },
     "deb": {
       "depends": [
