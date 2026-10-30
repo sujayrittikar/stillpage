@@ -169,3 +169,40 @@
   padding-left: 12px;
   border-left: 1px solid color-mix(in srgb, var(--surface) 30%, transparent);
 }
+
+/* Japanese entries */
+.define-head ruby {
+  ruby-position: over;
+}
+
+.define-head rt {
+  font: 400 11px var(--font-sans);
+  color: var(--muted);
+}
+
+.define-ja h5 {
+  margin: 14px 0 2px;
+  font: 600 16px var(--font-serif);
+}
+
+.define-reading {
+  margin-left: 8px;
+  font: 400 13px var(--font-sans);
+  color: var(--muted);
+}
+
+.define-forms {
+  margin: 2px 0 6px !important;
+  font-size: 13px !important;
+  color: var(--muted);
+}
+
+.define-tag {
+  display: block;
+  font-size: 11.5px;
+  color: var(--accent);
+}
+
+.define-ja ol {
+  margin-top: 8px;
+}

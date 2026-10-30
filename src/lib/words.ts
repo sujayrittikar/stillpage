@@ -1,4 +1,4 @@
-import { lookupable } from './dictionary'
+import { isJapanese, lookupable } from './dictionary'
 
 /** A word on screen: its text, where it is, and (in something editable) the
  *  range to replace when you pick a synonym. */
@@ -17,11 +17,21 @@ function wordRange(node: Node, offset: number): Range | null {
     if (seg.isWordLike && offset >= seg.index && offset <= seg.index + seg.segment.length) {
       const range = document.createRange()
       range.setStart(node, seg.index)
-      range.setEnd(node, seg.index + seg.segment.length)
+      // Japanese has no spaces, and a conjugated verb spans several of the
+      // segmenter's pieces: hand over a run of text and let the dictionary
+      // find the longest word in it.
+      range.setEnd(node, isJapanese(seg.segment) ? runEnd(text, seg.index) : seg.index + seg.segment.length)
       return range
     }
   }
   return null
+}
+
+/** Where a run of Japanese worth scanning ends: 16 characters on, or the
+ *  first punctuation or space. */
+function runEnd(text: string, from: number): number {
+  const stop = text.slice(from, from + 16).search(/[\s、。，．！？!?,.「」『』（）()・…]/u)
+  return stop < 0 ? Math.min(text.length, from + 16) : from + stop
 }
 
 const editableAt = (node: Node | null) => {
@@ -32,7 +42,7 @@ const editableAt = (node: Node | null) => {
 function toWordAt(range: Range): WordAt | null {
   const word = range.toString().trim()
   if (!lookupable(word)) return null
-  const r = range.getBoundingClientRect()
+  const r = range.getClientRects()[0] ?? range.getBoundingClientRect()
   return { word, rect: { left: r.left, top: r.top, bottom: r.bottom }, range: editableAt(range.startContainer) ? range.cloneRange() : null }
 }
 

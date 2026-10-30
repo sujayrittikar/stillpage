@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { define, lookupable, type Entry, type Sense } from '../lib/dictionary'
+import { define, isJapanese, lookupable, type EnglishEntry, type Entry, type JapaneseEntry, type Sense } from '../lib/dictionary'
+import { startAutocorrect } from '../lib/autocorrect'
 import type { MenuParams } from '../lib/types'
 import { wordAtPoint, wordAtSelection, type WordAt } from '../lib/words'
 import '../styles/dictionary.css'
@@ -18,6 +19,12 @@ function replaceWord(at: WordAt, text: string) {
   document.execCommand('insertText', false, fitted)
 }
 
+/** A word for a menu label. Japanese runs on, so only its start is shown. */
+const shortWord = (word: string) => {
+  const max = isJapanese(word) ? 5 : 24
+  return word.length > max ? word.slice(0, max) + '…' : word
+}
+
 const POS_ORDER: Sense['pos'][] = ['noun', 'verb', 'adjective', 'adverb']
 
 /** Right-click menu (spelling, look up, cut/copy/paste) and the definition
@@ -30,6 +37,19 @@ export function Dictionary() {
     setMenu(null)
     setCard({ at, suggestions })
   }, [])
+
+  // Autocorrect follows the setting live, without restarting.
+  useEffect(
+    () =>
+      startAutocorrect(() => {
+        try {
+          return (JSON.parse(localStorage.getItem('stillpage.prefs') ?? '{}') as { autocorrect?: boolean }).autocorrect !== false
+        } catch {
+          return true
+        }
+      }),
+    [],
+  )
 
   useEffect(() => {
     const bridge = window.stillpage
@@ -115,7 +135,7 @@ function WordMenu({ params, at, onLookUp, onClose }: { params: MenuParams; at: W
           null,
         ]
       : []),
-    ...(at ? [{ label: `Look up “${at.word.length > 24 ? at.word.slice(0, 24) + '…' : at.word}”`, hint: 'Ctrl D', run: () => onLookUp(at, misspelled ? params.suggestions : []) }, null] : []),
+    ...(at ? [{ label: `Look up “${shortWord(at.word)}”`, hint: 'Ctrl D', run: () => onLookUp(at, misspelled ? params.suggestions : []) }, null] : []),
     ...(params.isEditable ? [{ label: 'Cut', hint: 'Ctrl X', disabled: !params.canCut, run: () => act('cut') }] : []),
     { label: 'Copy', hint: 'Ctrl C', disabled: !params.canCopy, run: () => act('copy') },
     ...(params.isEditable ? [{ label: 'Paste', hint: 'Ctrl V', disabled: !params.canPaste, run: () => act('paste') }] : []),
@@ -149,7 +169,6 @@ function WordMenu({ params, at, onLookUp, onClose }: { params: MenuParams; at: W
 function DefineCard({ at, suggestions, onClose }: { at: WordAt; suggestions: string[]; onClose: () => void }) {
   const [entry, setEntry] = useState<Entry | null | undefined>(undefined)
   const [error, setError] = useState<string | null>(null)
-  const [all, setAll] = useState(false)
   const { box, style } = usePlace(at.rect, 360)
   useDismiss(box, onClose)
 
@@ -174,15 +193,27 @@ function DefineCard({ at, suggestions, onClose }: { at: WordAt; suggestions: str
     }
   }
 
-  const groups = POS_ORDER.map((pos) => ({ pos, senses: entry?.senses.filter((s) => s.pos === pos) ?? [] })).filter((g) => g.senses.length)
-  const limit = all ? Infinity : 3
-  const hidden = groups.reduce((n, g) => n + Math.max(0, g.senses.length - limit), 0)
+  const head = entry?.lang === 'ja' ? (entry.words[0].kanji[0] ?? entry.words[0].kana[0]) : (entry?.word ?? at.word)
+  const from = entry?.lang === 'ja' ? (entry.matched !== head ? entry.matched : null) : entry && entry.word.toLowerCase() !== at.word.toLowerCase() ? at.word : null
 
   return (
     <div ref={box} className="define-card" role="dialog" aria-label={`Definition of ${at.word}`} style={style}>
       <header className="define-head">
-        <h3>{entry?.word ?? at.word}</h3>
-        {entry && entry.word.toLowerCase() !== at.word.toLowerCase() && <span className="define-from">from “{at.word}”</span>}
+        {entry?.lang === 'ja' ? (
+          <h3 lang="ja">
+            <ruby>
+              {head}
+              {entry.words[0].kanji.length > 0 && <rt>{entry.words[0].kana[0]}</rt>}
+            </ruby>
+          </h3>
+        ) : (
+          <h3>{head}</h3>
+        )}
+        {from && (
+          <span className="define-from">
+            from “{from}”{entry?.lang === 'ja' && entry.words[0].reasons.length > 0 && `, ${entry.words[0].reasons.join(', ')}`}
+          </span>
+        )}
       </header>
       {entry === undefined && !error && <p className="define-quiet">Looking it up…</p>}
       {error && <p className="define-quiet">{error}</p>}
@@ -201,6 +232,19 @@ function DefineCard({ at, suggestions, onClose }: { at: WordAt; suggestions: str
           )}
         </>
       )}
+      {entry?.lang === 'en' && <English entry={entry} editable={Boolean(at.range)} onPick={pick} />}
+      {entry?.lang === 'ja' && <Japanese entry={entry} />}
+    </div>
+  )
+}
+
+function English({ entry, editable, onPick }: { entry: EnglishEntry; editable: boolean; onPick: (word: string) => void }) {
+  const [all, setAll] = useState(false)
+  const groups = POS_ORDER.map((pos) => ({ pos, senses: entry.senses.filter((s) => s.pos === pos) })).filter((g) => g.senses.length)
+  const limit = all ? Infinity : 3
+  const hidden = groups.reduce((n, g) => n + Math.max(0, g.senses.length - limit), 0)
+  return (
+    <>
       {groups.map((g) => (
         <section key={g.pos} className="define-pos">
           <h4>{g.pos}</h4>
@@ -212,7 +256,7 @@ function DefineCard({ at, suggestions, onClose }: { at: WordAt; suggestions: str
                 {s.synonyms.length > 0 && (
                   <div className="define-chips">
                     {s.synonyms.slice(0, 6).map((syn) => (
-                      <button key={syn} className="chip" title={at.range ? `Use “${syn}” instead` : `Copy “${syn}”`} onMouseDown={(e) => e.preventDefault()} onClick={() => pick(syn)}>
+                      <button key={syn} className="chip" title={editable ? `Use “${syn}” instead` : `Copy “${syn}”`} onMouseDown={(e) => e.preventDefault()} onClick={() => onPick(syn)}>
                         {syn}
                       </button>
                     ))}
@@ -228,7 +272,38 @@ function DefineCard({ at, suggestions, onClose }: { at: WordAt; suggestions: str
           {hidden} more {hidden === 1 ? 'sense' : 'senses'}
         </button>
       )}
-      {entry && <p className="define-source">{at.range ? 'Pick a word to put it in place. ' : ''}WordNet 3.0, Princeton University</p>}
-    </div>
+      <p className="define-source">{editable ? 'Pick a word to put it in place. ' : ''}WordNet 3.0, Princeton University</p>
+    </>
+  )
+}
+
+function Japanese({ entry }: { entry: JapaneseEntry }) {
+  return (
+    <>
+      {entry.words.map((w, i) => (
+        <section key={i} className="define-pos define-ja">
+          {i > 0 && (
+            <h5 lang="ja">
+              {w.kanji[0] ?? w.kana[0]}
+              {w.kanji.length > 0 && <span className="define-reading">{w.kana[0]}</span>}
+            </h5>
+          )}
+          {(w.kanji.length > 1 || w.kana.length > 1) && (
+            <p className="define-forms" lang="ja">
+              {[...w.kanji.slice(1), ...w.kana.slice(1)].join('、')}
+            </p>
+          )}
+          <ol>
+            {w.senses.slice(0, 5).map((s, j) => (
+              <li key={j}>
+                {s.pos.length > 0 && <span className="define-tag">{s.pos.join(', ')}</span>}
+                <p>{s.glosses.join('; ')}</p>
+              </li>
+            ))}
+          </ol>
+        </section>
+      ))}
+      <p className="define-source">JMdict, Electronic Dictionary Research and Development Group</p>
+    </>
   )
 }
