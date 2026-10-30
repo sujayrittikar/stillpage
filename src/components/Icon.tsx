@@ -16,6 +16,7 @@ const PATHS: Record<string, ReactNode> = {
   pause: <><path d="M8.5 5.5v13M15.5 5.5v13" strokeWidth="2.6" /></>,
   prev: <><path d="M17.5 6v12L9 12z" fill="currentColor" /><path d="M6.5 6v12" strokeWidth="2" /></>,
   next: <><path d="M6.5 6v12L15 12z" fill="currentColor" /><path d="M17.5 6v12" strokeWidth="2" /></>,
+  shuffle: <><path d="M4 7h3.5c4.5 0 4.5 10 9 10H20M4 17h3.5c1.6 0 2.6-1.3 3.4-3M13.1 10c.8-1.7 1.8-3 3.4-3H20" /><path d="m17.5 4.5 2.5 2.5-2.5 2.5M17.5 14.5l2.5 2.5-2.5 2.5" /></>,
   music: <><path d="M9 17.5V6l10-2v11.5" /><circle cx="6.5" cy="17.5" r="2.5" /><circle cx="16.5" cy="15.5" r="2.5" /></>,
   trash: <><path d="M5 7h14M10 7V5h4v2M7 7l.8 12h8.4L17 7" /></>,
   download: <><path d="M12 4v11m-4-4 4 4 4-4M5 19.5h14" /></>,
