@@ -1,0 +1,233 @@
+@import 'katex/dist/katex.min.css';
+
+/* ---------- Formulas ---------- */
+
+/* KaTeX's own sizes are tuned for 10pt TeX; match the reading text instead. */
+.katex {
+  font-size: 1.08em;
+}
+
+.prose .katex-display {
+  margin: 1.1em 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 2px 0;
+}
+
+.math-error {
+  color: var(--muted);
+  text-decoration: underline wavy color-mix(in srgb, var(--muted) 60%, transparent);
+}
+
+/* In notes: formulas are things you can click to edit. */
+.note-prose [data-type='inline-math'],
+.note-prose [data-type='block-math'] {
+  cursor: pointer;
+  border-radius: 4px;
+  transition: background-color 120ms;
+}
+
+.note-prose [data-type='inline-math'] {
+  padding: 0 2px;
+}
+
+.note-prose [data-type='block-math'] {
+  margin: 0.9em 0;
+  padding: 6px 0;
+  text-align: center;
+  overflow-x: auto;
+}
+
+.note-prose [data-type='inline-math']:hover,
+.note-prose [data-type='block-math']:hover,
+.note-prose .ProseMirror-selectednode[data-type$='-math'] {
+  background: var(--accent-soft);
+}
+
+.note-prose .block-math-error,
+.note-prose .inline-math-error {
+  font-family: var(--font-mono);
+  font-size: 0.85em;
+  color: var(--muted);
+}
+
+/* The editor */
+.math-editor {
+  position: fixed;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  box-shadow: var(--lift);
+  font-family: var(--font-sans);
+  color: var(--ink);
+}
+
+.math-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.math-kind button {
+  height: 26px;
+  padding: 0 10px;
+  font-size: 12.5px;
+}
+
+.math-keys {
+  margin-left: auto;
+  font-size: 11.5px;
+  color: var(--muted);
+}
+
+.math-source {
+  position: relative;
+}
+
+.math-source textarea {
+  display: block;
+  width: 100%;
+  resize: vertical;
+  min-height: 44px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--paper);
+  color: var(--ink);
+  font: 13.5px/1.5 var(--font-mono);
+  outline: none;
+  tab-size: 2;
+}
+
+.math-source textarea:focus {
+  border-color: var(--accent);
+}
+
+.math-suggest {
+  position: absolute;
+  z-index: 2;
+  top: calc(100% + 4px);
+  left: 0;
+  min-width: 260px;
+  margin: 0;
+  padding: 4px;
+  list-style: none;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: var(--lift);
+}
+
+.math-suggest li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 4px 8px;
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+.math-suggest li.on {
+  background: var(--accent-soft);
+}
+
+.math-suggest code {
+  font: 12.5px var(--font-mono);
+  color: var(--ink-2);
+}
+
+.math-suggest-glyph {
+  margin-left: auto;
+  max-width: 140px;
+  overflow: hidden;
+  font-size: 13px;
+}
+
+.math-preview {
+  min-height: 48px;
+  max-height: 180px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px;
+  overflow: auto;
+  border-radius: 8px;
+  background: var(--paper);
+  font-family: var(--font-serif);
+  font-size: 18px;
+}
+
+.math-preview.stale {
+  opacity: 0.45;
+}
+
+.math-empty {
+  font: italic 13px var(--font-sans);
+  color: var(--muted);
+}
+
+.math-error-line {
+  margin: -4px 2px 0;
+  font-size: 12px;
+  color: var(--ink-2);
+}
+
+.math-tabs {
+  display: flex;
+  gap: 2px;
+  border-bottom: 1px solid var(--line);
+}
+
+.math-tabs button {
+  padding: 4px 9px 6px;
+  margin-bottom: -1px;
+  border-bottom: 2px solid transparent;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+
+.math-tabs button.on {
+  color: var(--ink);
+  border-bottom-color: var(--accent);
+}
+
+.math-palette {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(44px, 1fr));
+  gap: 3px;
+  max-height: 150px;
+  overflow-y: auto;
+}
+
+.math-key {
+  height: 36px;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border-radius: 6px;
+  font-size: 15px;
+  color: var(--ink);
+}
+
+.math-key:hover {
+  background: var(--surface-2);
+}
+
+.math-key .katex {
+  font-size: 1em;
+}
+
+.math-foot {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.math-foot .grow {
+  flex: 1;
+}

@@ -19,6 +19,7 @@ const SHORTCUTS: [string, string][] = [
   ['Ctrl Tab', 'Next tab in pane'],
   ['Alt 1–4', 'Jump to pane'],
   ['Ctrl B / I / U', 'Bold, italic, underline in notes'],
+  ['Ctrl M', 'Formula in a note (Ctrl Shift M: on its own line)'],
 ]
 
 export function Settings({ prefs, set, onClose }: { prefs: Prefs; set: (p: Partial<Prefs>) => void; onClose: () => void }) {

@@ -127,7 +127,16 @@ const saveTimers = new Map<string, number>()
 export function titleFromText(text: string): string {
   const line = text.split('\n').find((l) => l.trim().length > 0)
   if (!line) return 'Untitled note'
-  return line.replace(/^#+\s*/, '').replace(/^>\s*/, '').replace(/[*_`]/g, '').trim().slice(0, 60) || 'Untitled note'
+  return (
+    line
+      .replace(/^#+\s*/, '')
+      .replace(/^>\s*/, '')
+      // A formula reads as its source, without the dollar signs around it.
+      .replace(/\$\$?((?:\\.|[^$\\])+?)\$\$?(?!\d)/g, (all, tex: string) => (/^\S/.test(tex) && /\S$/.test(tex) ? tex : all))
+      .replace(/[*_`]/g, '')
+      .trim()
+      .slice(0, 60) || 'Untitled note'
+  )
 }
 
 function notifyNote(id: string) {
