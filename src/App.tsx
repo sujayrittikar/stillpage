@@ -102,6 +102,23 @@ export default function App() {
     return () => window.removeEventListener('stillpage:toast', onToast)
   }, [toast])
 
+  // A note that became a file keeps its place: same pane, same tab slot.
+  useEffect(() => {
+    const onReplace = (e: Event) => {
+      const { from, to } = (e as CustomEvent<{ from: string; to: string }>).detail
+      setLayout((l) => ({
+        ...l,
+        panes: l.panes.map((p) => ({
+          ...p,
+          tabs: [...new Set(p.tabs.map((t) => (t === from ? to : t)))],
+          active: p.active === from ? to : p.active,
+        })),
+      }))
+    }
+    window.addEventListener('stillpage:replace-tab', onReplace)
+    return () => window.removeEventListener('stillpage:replace-tab', onReplace)
+  }, [])
+
   // Ctrl + / Ctrl - / Ctrl 0 and Ctrl + wheel: a PDF zooms its pages, anything
   // else (notes included) changes the text size everywhere, and it sticks.
   const zoomText = useCallback(

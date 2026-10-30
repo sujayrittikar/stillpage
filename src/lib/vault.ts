@@ -1,6 +1,6 @@
 import { useSyncExternalStore } from 'react'
 import { detectFormat } from './formats'
-import { importFiles, renamePath, useItems } from './library'
+import { getItem, importFiles, loadNote, removeItem, renamePath, useItems } from './library'
 import type { VaultScan } from './types'
 
 /** A file in the open folder that Stillpage can show. */
@@ -151,4 +151,27 @@ export function useOpenedPaths(): Map<string, string> {
   const map = new Map<string, string>()
   for (const item of Object.values(items)) if (item.path) map.set(item.path, item.id)
   return map
+}
+
+/** Turns a note kept in Stillpage's database into a Markdown file in the open
+ *  folder, named after the note. Returns the new document's id; the note is
+ *  removed only once the file is safely written and opened. */
+export async function moveNoteToVault(id: string): Promise<{ id: string; file: string } | null> {
+  const note = getItem(id)
+  if (!note || note.kind !== 'note' || !current) return null
+  const text = await loadNote(id)
+  const name = note.draft || note.title === 'Untitled note' ? 'Untitled' : note.title
+  const file = await window.stillpage?.vault?.create('', name, text)
+  if (!file) return null
+  const moved = await itemForFile(file)
+  if (!moved) return null
+  try {
+    // It was being written in, so it opens ready to write in.
+    localStorage.setItem(`stillpage.mode.${moved}`, 'edit')
+  } catch {
+    /* opens in reading view instead */
+  }
+  await removeItem(id)
+  await rescan()
+  return { id: moved, file }
 }
