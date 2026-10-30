@@ -15,6 +15,12 @@ contextBridge.exposeInMainWorld('stillpage', {
     logout: () => ipcRenderer.invoke('spotify-web-logout'),
   },
   drmStatus: () => ipcRenderer.invoke('drm-status'),
+  onContextMenu: (callback) => {
+    const listener = (_event, params) => callback(params)
+    ipcRenderer.on('context-menu', listener)
+    return () => ipcRenderer.removeListener('context-menu', listener)
+  },
+  editAction: (action, word) => ipcRenderer.invoke('edit-action', action, word),
   spanScreens: (on) => ipcRenderer.invoke('span-screens', on),
   screenInfo: () => ipcRenderer.invoke('screen-info'),
   onSpanChanged: (callback) => {

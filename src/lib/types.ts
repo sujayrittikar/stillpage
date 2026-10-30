@@ -72,6 +72,20 @@ export interface Sheet {
  *  as the author's own pages (rendered by LibreOffice). */
 export type DocView = 'reading' | 'original'
 
+/** What was under the pointer on a right-click. */
+export interface MenuParams {
+  x: number
+  y: number
+  selectionText: string
+  misspelledWord: string
+  suggestions: string[]
+  isEditable: boolean
+  canCut: boolean
+  canCopy: boolean
+  canPaste: boolean
+  canSelectAll: boolean
+}
+
 export type Rendered =
   | { type: 'html'; html: string; variant?: 'code' | 'plain' }
   | { type: 'pdf'; data: ArrayBuffer }
@@ -98,6 +112,8 @@ declare global {
         logout: () => Promise<boolean>
       }
       drmStatus: () => Promise<'ready' | 'unavailable'>
+      onContextMenu: (cb: (params: MenuParams) => void) => () => void
+      editAction: (action: 'replace' | 'learn' | 'cut' | 'copy' | 'paste' | 'selectAll', word?: string) => Promise<void>
       spanScreens: (on?: boolean) => Promise<{ spanned: boolean; seams: number[] }>
       screenInfo: () => Promise<{ count: number; spanned: boolean }>
       onSpanChanged: (cb: (spanned: boolean) => void) => () => void

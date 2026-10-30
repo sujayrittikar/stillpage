@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react'
 import { Enso, Icon } from './components/Icon'
 import { FocusTimer } from './components/FocusTimer'
+import { Dictionary } from './components/Dictionary'
 import { Library } from './components/Library'
 import { PaneView } from './components/PaneView'
 import { SelectionCapture, type Capture } from './components/SelectionCapture'
@@ -467,6 +468,7 @@ export default function App() {
 
       <SelectionCapture onCapture={capture} />
       <SpotifyDock zen={zen} />
+      <Dictionary />
 
       {ensoMoment && (
         <div className="enso-moment" aria-hidden="true">
