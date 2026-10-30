@@ -1,4 +1,5 @@
-import { useState, type DragEvent } from 'react'
+import { useRef, useState, type DragEvent } from 'react'
+import { usePaneFit } from '../lib/fit'
 import { FORMAT_LABEL } from '../lib/formats'
 import type { Item, Pane, Prefs } from '../lib/types'
 import { DocView } from './DocView'
@@ -47,6 +48,8 @@ export function PaneView(p: Props) {
   }
 
   const tabs = p.pane.tabs.filter((id) => p.items[id])
+  const body = useRef<HTMLDivElement>(null)
+  usePaneFit(body, p.prefs)
 
   return (
     <section
@@ -126,7 +129,7 @@ export function PaneView(p: Props) {
           </button>
         )}
       </header>
-      <div className="pane-body">
+      <div className="pane-body" ref={body}>
         {tabs.length === 0 && (
           <div className="empty">
             <Enso size={88} className="empty-enso" />
