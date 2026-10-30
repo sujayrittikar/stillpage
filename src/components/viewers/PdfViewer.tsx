@@ -13,11 +13,13 @@ export default function PdfViewer({ id, data, tint }: { id: string; data: ArrayB
   const scrollRef = useRef<HTMLDivElement>(null)
   const [doc, setDoc] = useState<PDFDocumentProxy | null>(null)
   const [sizes, setSizes] = useState<Size[]>([])
-  const [zoom, setZoom] = useState<number | 'fit'>('fit')
+  // Zoom is kept relative to fitting the width, so pages grow and shrink with
+  // the pane: drag the divider and a page at 130% stays at 130% of the pane.
+  const [zoom, setZoom] = useState(1)
   const [width, setWidth] = useState(0)
   const [page, setPage] = useState(1)
   const [error, setError] = useState<string | null>(null)
-  const currentScale = useRef(1)
+  const fitScale = useRef(1)
 
   useEffect(() => {
     let cancelled = false
@@ -59,7 +61,7 @@ export default function PdfViewer({ id, data, tint }: { id: string; data: ArrayB
     const onWheel = (e: WheelEvent) => {
       if (!e.ctrlKey) return
       e.preventDefault()
-      setZoom((z) => clampZoom((z === 'fit' ? currentScale.current : z) * (e.deltaY < 0 ? 1.1 : 0.9)))
+      setZoom((z) => relative(fitScale.current, fitScale.current * z * (e.deltaY < 0 ? 1.1 : 0.9)))
     }
     el.addEventListener('wheel', onWheel, { passive: false })
     return () => {
@@ -69,7 +71,11 @@ export default function PdfViewer({ id, data, tint }: { id: string; data: ArrayB
   }, [])
 
   const maxW = sizes.reduce((m, s) => Math.max(m, s[0]), 1)
-  const scale = zoom === 'fit' ? clampZoom((width - 56) / maxW) : zoom
+  const fit = clampZoom((width - 56) / maxW)
+  const scale = clampZoom(fit * zoom)
+  useLayoutEffect(() => {
+    fitScale.current = fit
+  }, [fit])
   // Keep the spot you were looking at in the middle while the pages grow or
   // shrink, instead of drifting to the top-left.
   const previousScale = useRef(scale)
@@ -77,7 +83,6 @@ export default function PdfViewer({ id, data, tint }: { id: string; data: ArrayB
     const el = scrollRef.current
     const ratio = scale / previousScale.current
     previousScale.current = scale
-    currentScale.current = scale
     if (!el || ratio === 1) return
     el.scrollTop = (el.scrollTop + el.clientHeight / 2) * ratio - el.clientHeight / 2
     el.scrollLeft = (el.scrollLeft + el.clientWidth / 2) * ratio - el.clientWidth / 2
@@ -87,8 +92,8 @@ export default function PdfViewer({ id, data, tint }: { id: string; data: ArrayB
     const onZoom = (e: Event) => {
       const { id: target, dir } = (e as CustomEvent<{ id: string; dir: 1 | -1 | 0 }>).detail
       if (target !== id) return
-      if (dir === 0) setZoom('fit')
-      else setZoom(clampZoom(currentScale.current * (dir > 0 ? 1.15 : 0.85)))
+      if (dir === 0) setZoom(1)
+      else setZoom((z) => relative(fitScale.current, fitScale.current * z * (dir > 0 ? 1.15 : 0.85)))
     }
     window.addEventListener('stillpage:pdf-zoom', onZoom)
     return () => window.removeEventListener('stillpage:pdf-zoom', onZoom)
@@ -136,13 +141,13 @@ export default function PdfViewer({ id, data, tint }: { id: string; data: ArrayB
             <span>of {sizes.length}</span>
           </label>
           <span className="pdf-sep" />
-          <button className="icon-btn" title="Zoom out" onClick={() => setZoom(clampZoom(scale * 0.85))}>
+          <button className="icon-btn" title="Zoom out" onClick={() => setZoom(relative(fit, scale * 0.85))}>
             <Icon name="minus" size={16} />
           </button>
-          <button className={`text-btn ${zoom === 'fit' ? 'on' : ''}`} title="Fit width" onClick={() => setZoom('fit')}>
+          <button className={`text-btn ${zoom === 1 ? 'on' : ''}`} title="Fit width" onClick={() => setZoom(1)}>
             {Math.round(scale * 100)}%
           </button>
-          <button className="icon-btn" title="Zoom in" onClick={() => setZoom(clampZoom(scale * 1.15))}>
+          <button className="icon-btn" title="Zoom in" onClick={() => setZoom(relative(fit, scale * 1.15))}>
             <Icon name="plus" size={16} />
           </button>
         </div>
@@ -153,6 +158,11 @@ export default function PdfViewer({ id, data, tint }: { id: string; data: ArrayB
 
 function clampZoom(z: number) {
   return Math.min(4, Math.max(0.3, Number.isFinite(z) ? z : 1))
+}
+
+/** A wanted scale as a multiple of the fit-width scale. */
+function relative(fit: number, scale: number) {
+  return clampZoom(scale) / fit
 }
 
 function PdfPage({ doc, num, scale, width, height }: { doc: PDFDocumentProxy; num: number; scale: number; width: number; height: number }) {
