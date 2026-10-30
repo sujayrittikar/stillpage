@@ -1,5 +1,7 @@
 import { lazy, Suspense, useEffect, useRef, useState, type ReactNode } from 'react'
+import { EDITABLE } from '../lib/files'
 import { HAS_ORIGINAL, kindName } from '../lib/formats'
+import { refreshFromDisk } from '../lib/library'
 import { NeedsOffice, renderItem } from '../lib/render'
 import type { DocView as View, Item, Prefs, Rendered } from '../lib/types'
 import { Enso, Icon } from './Icon'
@@ -9,6 +11,20 @@ import { SheetViewer } from './viewers/SheetViewer'
 import { SlidesViewer } from './viewers/SlidesViewer'
 
 const PdfViewer = lazy(() => import('./viewers/PdfViewer'))
+const FileEditor = lazy(() => import('./FileEditor').then((m) => ({ default: m.FileEditor })))
+
+/** Reading a text file, or editing it: as a page (Markdown) or as text. */
+type Mode = 'read' | 'edit' | 'source'
+const modeKey = (id: string) => `stillpage.mode.${id}`
+
+function readMode(id: string): Mode {
+  try {
+    const m = localStorage.getItem(modeKey(id))
+    return m === 'edit' || m === 'source' ? m : 'read'
+  } catch {
+    return 'read'
+  }
+}
 
 export function Loading({ slowly }: { slowly?: string }) {
   // Converting with LibreOffice can take a few seconds the first time; say so
@@ -104,6 +120,28 @@ export function ScrollArea({ children, className = '' }: { children: ReactNode; 
 
 export function DocView({ item, prefs }: { item: Item; prefs: Prefs }) {
   const [view, setViewState] = useState<View>(() => readView(item.id))
+  const [mode, setModeState] = useState<Mode>(() => readMode(item.id))
+  const editable = EDITABLE.has(item.format!)
+  const editing = editable && mode !== 'read'
+
+  const setMode = (m: Mode) => {
+    setModeState(m)
+    try {
+      localStorage.setItem(modeKey(item.id), m)
+    } catch {
+      /* not remembered, still switched */
+    }
+  }
+
+  // A file that lives on disk may have changed since we last read it:
+  // check when it's opened and whenever you come back to the window.
+  useEffect(() => {
+    if (!item.path) return
+    const check = () => void refreshFromDisk(item.id)
+    check()
+    window.addEventListener('focus', check)
+    return () => window.removeEventListener('focus', check)
+  }, [item.id, item.path])
   const [attempt, setAttempt] = useState(0)
   // Each result remembers which view and attempt it answers, so switching
   // views shows the loader instead of the previous view's pages.
@@ -120,8 +158,9 @@ export function DocView({ item, prefs }: { item: Item; prefs: Prefs }) {
     }
   }
 
-  const key = `${item.id}:${effective}:${attempt}`
+  const key = `${item.id}:${effective}:${attempt}:${item.fingerprint}`
   useEffect(() => {
+    if (editing) return
     let alive = true
     renderItem(item, effective).then(
       (r) => alive && setResult({ key, rendered: r }),
@@ -130,12 +169,42 @@ export function DocView({ item, prefs }: { item: Item; prefs: Prefs }) {
     return () => {
       alive = false
     }
-  }, [item, effective, key])
+  }, [item, effective, key, editing])
   const current = result?.key === key ? result : null
   const rendered = current?.rendered ?? null
   const error = current?.error ?? null
 
-  const switcher = switchable && (
+  const modes: Mode[] = item.format === 'md' ? ['read', 'edit', 'source'] : ['read', 'edit']
+  const modeSwitch = editable && (
+    <div className="view-switch segmented" role="radiogroup" aria-label="Read or edit">
+      {modes.map((m) => (
+        <button
+          key={m}
+          role="radio"
+          aria-checked={mode === m}
+          className={mode === m ? 'on' : ''}
+          onClick={() => setMode(m)}
+          title={m === 'read' ? 'Read it, typeset' : m === 'edit' ? (item.format === 'md' ? 'Write in it like a page' : 'Edit the text') : 'Edit the Markdown itself'}
+        >
+          <Icon name={m === 'read' ? 'read' : m === 'edit' ? 'note' : 'code'} size={14} />
+          <span>{m === 'read' ? 'Read' : m === 'edit' ? 'Edit' : 'Source'}</span>
+        </button>
+      ))}
+    </div>
+  )
+
+  if (editing) {
+    return (
+      <div className="doc doc-edit" data-capture-source={item.title}>
+        {modeSwitch}
+        <Suspense fallback={<Loading />}>
+          <FileEditor key={`${item.id}:${mode}`} item={item} mode={mode === 'edit' ? 'page' : 'source'} />
+        </Suspense>
+      </div>
+    )
+  }
+
+  const switcher = (switchable && (
     <div className="view-switch segmented" role="radiogroup" aria-label="How to show this document">
       {(['reading', 'original'] as View[]).map((v) => (
         <button
@@ -151,7 +220,7 @@ export function DocView({ item, prefs }: { item: Item; prefs: Prefs }) {
         </button>
       ))}
     </div>
-  )
+  )) || modeSwitch
 
   if (error instanceof NeedsOffice) {
     return (

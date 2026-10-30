@@ -1,4 +1,4 @@
-const { contextBridge, ipcRenderer } = require('electron')
+const { contextBridge, ipcRenderer, webUtils } = require('electron')
 
 contextBridge.exposeInMainWorld('stillpage', {
   platform: process.platform,
@@ -28,4 +28,9 @@ contextBridge.exposeInMainWorld('stillpage', {
   officeStatus: () => ipcRenderer.invoke('office-status'),
   convertToPdf: (name, data) => ipcRenderer.invoke('convert-to-pdf', name, data),
   openExternal: (url) => ipcRenderer.invoke('open-external', url),
+  pathForFile: (file) => webUtils.getPathForFile(file),
+  readTextFile: (file) => ipcRenderer.invoke('read-text-file', file),
+  writeTextFile: (file, text, expectedMtime, force) => ipcRenderer.invoke('write-text-file', file, text, expectedMtime, force),
+  statFile: (file) => ipcRenderer.invoke('stat-file', file),
+  readFiles: (files) => ipcRenderer.invoke('read-files', files),
 })

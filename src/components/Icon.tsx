@@ -31,6 +31,7 @@ const PATHS: Record<string, ReactNode> = {
   fullscreen: <path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5" />,
   read: <><path d="M3.5 6.5c3-1.2 5.8-1.2 8.5 1 2.7-2.2 5.5-2.2 8.5-1v12c-3-1.2-5.8-1.2-8.5 1-2.7-2.2-5.5-2.2-8.5-1z" /><path d="M12 7.5v12" /></>,
   write: <><path d="M4 7h16M4 12h10M4 17h7" /></>,
+  code: <path d="m8.5 7.5-4.5 4.5 4.5 4.5M15.5 7.5l4.5 4.5-4.5 4.5" />,
   both: <><rect x="3.5" y="4.5" width="17" height="15" rx="2" /><path d="M12 4.5v15M6 9h3.5M6 12h3.5M14.5 9H18M14.5 12H18" /></>,
   quote: <><path d="M5 18c0-4 1-7.5 4.5-9.5M13.5 18c0-4 1-7.5 4.5-9.5" /><path d="M5 18h4v-4H5zM13.5 18h4v-4h-4z" /></>,
   list: <path d="M9 6.5h11M9 12h11M9 17.5h11M4.5 6.5h.01M4.5 12h.01M4.5 17.5h.01" strokeWidth="1.8" />,

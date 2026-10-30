@@ -23,6 +23,10 @@ export interface Item {
   ext?: string
   size?: number
   fingerprint?: string
+  /** Where the file lives on disk, when we know. Edits are saved there. */
+  path?: string
+  /** The file's modification time when we last read or wrote it. */
+  mtime?: number
   createdAt: number
   updatedAt: number
   lastOpenedAt: number
@@ -81,6 +85,7 @@ export type Rendered =
 
 export interface DesktopFile {
   name: string
+  path?: string
   data: Uint8Array
   lastModified: number
 }
@@ -107,6 +112,11 @@ declare global {
       officeStatus: () => Promise<{ ready: boolean; install: string }>
       convertToPdf: (name: string, data: Uint8Array) => Promise<{ pdf?: Uint8Array; error?: string }>
       openExternal: (url: string) => Promise<void>
+      pathForFile: (file: File) => string
+      readTextFile: (file: string) => Promise<{ text?: string; mtime?: number; error?: string }>
+      writeTextFile: (file: string, text: string, expectedMtime?: number, force?: boolean) => Promise<{ mtime?: number; conflict?: boolean; error?: string }>
+      statFile: (file: string) => Promise<{ mtime: number; size: number } | null>
+      readFiles: (files: string[]) => Promise<DesktopFile[]>
     }
   }
 }
