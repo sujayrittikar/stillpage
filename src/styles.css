@@ -2493,3 +2493,78 @@ kbd {
 .prose nav p {
   margin: 0.2em 0;
 }
+
+/* ---------- Editing files ---------- */
+
+.doc-edit {
+  display: flex;
+  flex-direction: column;
+}
+
+.file-edit {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.file-bar {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-height: 52px;
+  padding: 0 260px 0 18px;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+
+.file-status.error {
+  color: #9b4b45;
+}
+
+.file-note {
+  font-style: italic;
+}
+
+.file-conflict {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0 18px 8px;
+  padding: 8px 10px 8px 14px;
+  border-radius: 10px;
+  background: var(--accent-soft);
+  font-size: 13.5px;
+}
+
+.file-conflict span {
+  margin-right: auto;
+}
+
+.file-body {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+}
+
+.file-body > .note-write {
+  position: absolute;
+  inset: 0;
+}
+
+.code-editor {
+  position: absolute;
+  inset: 0;
+}
+
+.app.zen .file-bar {
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.app.zen .file-bar:hover {
+  opacity: 1;
+}

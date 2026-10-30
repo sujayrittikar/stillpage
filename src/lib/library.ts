@@ -47,18 +47,27 @@ export interface ImportResult {
   rejected: string[]
 }
 
-export async function importFiles(files: File[]): Promise<ImportResult> {
+/** Imports files into the library. `paths` gives where each came from on
+ *  disk when the caller knows; otherwise the desktop bridge is asked. */
+export async function importFiles(files: File[], paths: (string | undefined)[] = []): Promise<ImportResult> {
   const ids: string[] = []
   const rejected: string[] = []
-  for (const file of files) {
+  for (const [i, file] of files.entries()) {
     const format = detectFormat(file.name)
     if (!format) {
       rejected.push(`${file.name} is not a format Stillpage can read yet.`)
       continue
     }
+    const path = paths[i] || window.stillpage?.pathForFile?.(file) || undefined
     const fingerprint = `${file.name}:${file.size}:${file.lastModified}`
-    const existing = Object.values(items).find((i) => i.fingerprint === fingerprint)
+    // The same file again, even if it has changed since: refresh our copy.
+    const existing = Object.values(items).find((it) => (path && it.path === path) || it.fingerprint === fingerprint)
     if (existing) {
+      if (existing.fingerprint !== fingerprint) {
+        await db.set('blob:' + existing.id, file)
+        forgetRendered(existing.id)
+      }
+      items[existing.id] = { ...existing, path: path ?? existing.path, mtime: file.lastModified, size: file.size, fingerprint }
       ids.push(existing.id)
       continue
     }
@@ -73,6 +82,7 @@ export async function importFiles(files: File[]): Promise<ImportResult> {
       ext: extOf(file.name),
       size: file.size,
       fingerprint,
+      ...(path && { path, mtime: file.lastModified }),
       createdAt: now,
       updatedAt: now,
       lastOpenedAt: now,
@@ -88,6 +98,45 @@ export function getBlob(id: string): Promise<Blob | undefined> {
   return db.get<Blob>('blob:' + id)
 }
 
+// The renderer's parsed copy of each document; set by render.ts so a changed
+// file is parsed again.
+let forgetRendered: (id: string) => void = () => {}
+export function onContentChanged(forget: (id: string) => void) {
+  forgetRendered = forget
+}
+
+/** Replaces a document's text after it was edited here or changed on disk. */
+export async function setDocText(id: string, text: string, mtime?: number) {
+  const item = items[id]
+  if (!item) return
+  const blob = new Blob([text], { type: 'text/plain' })
+  await db.set('blob:' + id, blob)
+  forgetRendered(id)
+  const name = `${item.title}.${item.ext ?? 'txt'}`
+  items[id] = { ...item, size: blob.size, mtime: mtime ?? item.mtime, fingerprint: `${name}:${blob.size}:${mtime ?? Date.now()}`, updatedAt: Date.now() }
+  emit()
+  persist()
+}
+
+/** Reads a document that lives on disk again if it changed there. Returns
+ *  true when it did. */
+export async function refreshFromDisk(id: string): Promise<boolean> {
+  const item = items[id]
+  const bridge = window.stillpage
+  if (!item?.path || !bridge?.statFile) return false
+  const stat = await bridge.statFile(item.path)
+  if (!stat || (item.mtime !== undefined && Math.abs(stat.mtime - item.mtime) <= 1)) return false
+  const name = item.path.split('/').pop() ?? item.title
+  const [file] = await bridge.readFiles([item.path])
+  if (!file) return false
+  await db.set('blob:' + id, new File([file.data as BlobPart], name, { lastModified: stat.mtime }))
+  forgetRendered(id)
+  items[id] = { ...item, mtime: stat.mtime, size: stat.size, fingerprint: `${name}:${stat.size}:${stat.mtime}`, updatedAt: Date.now() }
+  emit()
+  persist()
+  return true
+}
+
 /** The author's-layout PDF LibreOffice made for a document, kept so each file
  *  is converted once. */
 export function getOriginal(id: string): Promise<Blob | undefined> {
@@ -96,6 +145,10 @@ export function getOriginal(id: string): Promise<Blob | undefined> {
 
 export function setOriginal(id: string, pdf: Blob): Promise<void> {
   return db.set('original:' + id, pdf)
+}
+
+export function dropOriginal(id: string): Promise<void> {
+  return db.del('original:' + id)
 }
 
 export function createNote(initial = ''): string {

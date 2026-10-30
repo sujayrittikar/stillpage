@@ -1,8 +1,16 @@
 import { CODE_LANG } from './formats'
-import { getBlob, getOriginal, setOriginal } from './library'
+import { dropOriginal, getBlob, getOriginal, onContentChanged, setOriginal } from './library'
 import type { DocView, Item, Rendered } from './types'
 
 const cache = new Map<string, Promise<Rendered>>()
+
+// An edited or changed file is parsed afresh. The original-layout PDF is
+// LibreOffice's drawing of the old content, so it goes too.
+onContentChanged((id) => {
+  cache.delete(`${id}:reading`)
+  cache.delete(`${id}:original`)
+  void dropOriginal(id)
+})
 
 /** LibreOffice is needed to show this file and isn't installed. */
 export class NeedsOffice extends Error {}

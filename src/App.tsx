@@ -143,9 +143,9 @@ export default function App() {
   }, [])
 
   const handleFiles = useCallback(
-    async (files: File[], paneId?: string) => {
+    async (files: File[], paneId?: string, paths?: (string | undefined)[]) => {
       if (!files.length) return
-      const { ids, rejected } = await importFiles(files)
+      const { ids, rejected } = await importFiles(files, paths)
       rejected.forEach(toast)
       openItems(ids, paneId)
     },
@@ -156,7 +156,12 @@ export default function App() {
   useEffect(() => {
     const bridge = window.stillpage
     if (!bridge) return
-    const take = (list: DesktopFile[]) => handleFiles(list.map((f) => new File([f.data as BlobPart], f.name, { lastModified: f.lastModified })))
+    const take = (list: DesktopFile[]) =>
+      handleFiles(
+        list.map((f) => new File([f.data as BlobPart], f.name, { lastModified: f.lastModified })),
+        undefined,
+        list.map((f) => f.path),
+      )
     void bridge.takePendingFiles().then(take)
     return bridge.onOpenFiles(take)
   }, [handleFiles])

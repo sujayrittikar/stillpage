@@ -66,7 +66,7 @@ function filesFromArgv(argv) {
 }
 
 function readFiles(paths) {
-  return paths.map((p) => ({ name: path.basename(p), data: fs.readFileSync(p), lastModified: fs.statSync(p).mtimeMs }))
+  return paths.map((p) => ({ name: path.basename(p), path: p, data: fs.readFileSync(p), lastModified: fs.statSync(p).mtimeMs }))
 }
 
 function openPaths(paths) {
@@ -338,6 +338,70 @@ ipcMain.handle('save-file', async (_event, name, text) => {
 })
 ipcMain.handle('show-in-folder', (_event, file) => {
   if (typeof file === 'string' && path.isAbsolute(file)) shell.showItemInFolder(file)
+})
+
+// ---------- Editing files in place ----------
+// Text files you open can be edited, and the edits go back to the file.
+// Only existing, plain-text files are ever written, and only when they still
+// look the way they did when Stillpage read them (or you say to overwrite).
+
+const MAX_TEXT_BYTES = 32 * 1024 * 1024
+const BINARY_EXT = /\.(pdf|docx?|pptx?|xlsx?|od[tpsg]|epub|png|jpe?g|gif|webp|avif|bmp|zip|gz|exe|so|bin)$/i
+
+function textFile(file) {
+  if (typeof file !== 'string' || !path.isAbsolute(file) || BINARY_EXT.test(file)) return null
+  try {
+    const stat = fs.statSync(file)
+    return stat.isFile() && stat.size <= MAX_TEXT_BYTES ? stat : null
+  } catch {
+    return null
+  }
+}
+
+ipcMain.handle('read-text-file', (_event, file) => {
+  const stat = textFile(file)
+  if (!stat) return { error: 'missing' }
+  return { text: fs.readFileSync(file, 'utf8'), mtime: stat.mtimeMs }
+})
+
+ipcMain.handle('read-files', (_event, files) => {
+  if (!Array.isArray(files)) return []
+  const ok = files.filter((file) => {
+    try {
+      const stat = typeof file === 'string' && path.isAbsolute(file) ? fs.statSync(file) : null
+      return Boolean(stat?.isFile() && stat.size <= MAX_FILE_BYTES)
+    } catch {
+      return false
+    }
+  })
+  return readFiles(ok)
+})
+
+ipcMain.handle('stat-file', (_event, file) => {
+  try {
+    const stat = typeof file === 'string' && path.isAbsolute(file) ? fs.statSync(file) : null
+    return stat?.isFile() ? { mtime: stat.mtimeMs, size: stat.size } : null
+  } catch {
+    return null
+  }
+})
+
+ipcMain.handle('write-text-file', (_event, file, text, expectedMtime, force) => {
+  const stat = textFile(file)
+  if (!stat || typeof text !== 'string') return { error: 'This file is no longer where it was opened from.' }
+  // Changed by something else since we read it: ask before overwriting.
+  if (!force && typeof expectedMtime === 'number' && Math.abs(stat.mtimeMs - expectedMtime) > 1) return { conflict: true, mtime: stat.mtimeMs }
+  try {
+    // Write next to the file and swap it in, so a crash never leaves half a
+    // file. Through a symlink, the file it points to is the one replaced.
+    const real = fs.realpathSync(file)
+    const temp = path.join(path.dirname(real), `.${path.basename(real)}.stillpage-${process.pid}`)
+    fs.writeFileSync(temp, text, { mode: stat.mode })
+    fs.renameSync(temp, real)
+    return { mtime: fs.statSync(file).mtimeMs }
+  } catch (err) {
+    return { error: err?.code === 'EACCES' || err?.code === 'EROFS' ? 'This file is read-only.' : 'The file could not be saved.' }
+  }
 })
 
 // ---------- LibreOffice ----------
