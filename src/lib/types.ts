@@ -26,6 +26,10 @@ export interface Item {
   createdAt: number
   updatedAt: number
   lastOpenedAt: number
+  /** A note nobody has written in or named yet. Never saved. */
+  draft?: boolean
+  /** Named by hand, so the title no longer follows the first line. */
+  named?: boolean
 }
 
 export interface Pane {

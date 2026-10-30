@@ -16,6 +16,7 @@ interface Props {
   onFocus: () => void
   onActivate: (id: string) => void
   onCloseTab: (id: string) => void
+  onRename: (id: string, title: string) => void
   onClosePane: () => void
   onDropTab: (id: string, fromPane: string) => void
   onDropFiles: (files: File[]) => void
@@ -25,6 +26,7 @@ interface Props {
 
 export function PaneView(p: Props) {
   const [dropping, setDropping] = useState(false)
+  const [renaming, setRenaming] = useState<string | null>(null)
 
   const accepts = (e: DragEvent) => e.dataTransfer.types.includes(TAB_MIME) || e.dataTransfer.types.includes('Files')
   const onDragOver = (e: DragEvent) => {
@@ -66,8 +68,9 @@ export function PaneView(p: Props) {
                 tabIndex={0}
                 aria-selected={id === p.pane.active}
                 className={`tab ${id === p.pane.active ? 'on' : ''} kind-${item.kind}`}
-                draggable
-                title={item.title}
+                draggable={renaming !== id}
+                title={item.kind === 'note' ? `${item.title}. Double-click to rename.` : item.title}
+                onDoubleClick={() => item.kind === 'note' && setRenaming(id)}
                 onDragStart={(e) => {
                   e.dataTransfer.setData(TAB_MIME, JSON.stringify({ id, from: p.pane.id }))
                   e.dataTransfer.effectAllowed = 'move'
@@ -77,7 +80,31 @@ export function PaneView(p: Props) {
                 onAuxClick={(e) => e.button === 1 && p.onCloseTab(id)}
               >
                 {item.kind === 'note' && <Icon name="note" size={13} />}
-                <span className="tab-title">{item.title}</span>
+                {renaming === id ? (
+                  <input
+                    className="tab-rename"
+                    aria-label="Note name"
+                    defaultValue={item.draft ? '' : item.title}
+                    placeholder="Name this note"
+                    autoFocus
+                    onFocus={(e) => e.currentTarget.select()}
+                    onClick={(e) => e.stopPropagation()}
+                    onKeyDown={(e) => {
+                      e.stopPropagation()
+                      if (e.key === 'Enter') e.currentTarget.blur()
+                      if (e.key === 'Escape') {
+                        e.currentTarget.value = ''
+                        e.currentTarget.blur()
+                      }
+                    }}
+                    onBlur={(e) => {
+                      p.onRename(id, e.currentTarget.value)
+                      setRenaming(null)
+                    }}
+                  />
+                ) : (
+                  <span className="tab-title">{item.title}</span>
+                )}
                 {item.format && <span className="tab-kind">{FORMAT_LABEL[item.format]}</span>}
                 <button
                   className="tab-close"

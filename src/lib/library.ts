@@ -12,8 +12,10 @@ function emit() {
   items = { ...items }
   listeners.forEach((l) => l())
 }
+// A new note stays a draft, in memory only, until it gets words or a name.
+// Opening "New note" and walking away leaves nothing behind.
 function persist() {
-  void db.set('items', items)
+  void db.set('items', Object.fromEntries(Object.entries(items).filter(([, i]) => !i.draft)))
 }
 function subscribe(l: () => void) {
   listeners.add(l)
@@ -99,12 +101,35 @@ export function setOriginal(id: string, pdf: Blob): Promise<void> {
 export function createNote(initial = ''): string {
   const id = uid()
   const now = Date.now()
-  items[id] = { id, kind: 'note', title: titleFromText(initial), createdAt: now, updatedAt: now, lastOpenedAt: now }
+  const draft = !initial.trim()
+  items[id] = { id, kind: 'note', title: titleFromText(initial), createdAt: now, updatedAt: now, lastOpenedAt: now, ...(draft && { draft }) }
   notes.set(id, initial)
-  void db.set('note:' + id, initial)
+  if (!draft) void db.set('note:' + id, initial)
   emit()
   persist()
   return id
+}
+
+/** Names a note. A named note keeps its name instead of following its first line. */
+export function renameItem(id: string, title: string) {
+  const item = items[id]
+  const name = title.trim().slice(0, 120)
+  if (!item || !name || name === item.title) return
+  items[id] = { ...item, title: name, named: true, draft: undefined, updatedAt: Date.now() }
+  if (item.draft) void db.set('note:' + id, notes.get(id) ?? '')
+  emit()
+  persist()
+}
+
+/** Forgets drafts that are no longer open anywhere. */
+export function discardDrafts(open: Set<string>) {
+  const gone = Object.values(items).filter((i) => i.draft && !open.has(i.id))
+  if (!gone.length) return
+  for (const i of gone) {
+    delete items[i.id]
+    notes.delete(i.id)
+  }
+  emit()
 }
 
 export async function removeItem(id: string) {
@@ -144,12 +169,14 @@ export function setNote(id: string, text: string) {
   notes.set(id, text)
   notifyNote(id)
   window.clearTimeout(saveTimers.get(id))
+  if (items[id]?.draft && !text.trim()) return
   saveTimers.set(
     id,
     window.setTimeout(() => {
       void db.set('note:' + id, text)
       if (items[id]) {
-        items[id] = { ...items[id], title: titleFromText(text), updatedAt: Date.now() }
+        const item = items[id]
+        items[id] = { ...item, title: item.named ? item.title : titleFromText(text), draft: undefined, updatedAt: Date.now() }
         emit()
         persist()
       }

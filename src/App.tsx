@@ -8,7 +8,7 @@ import { Settings } from './components/Settings'
 import { SpotifyDock } from './components/SpotifyDock'
 import { uid } from './lib/db'
 import { ACCEPT } from './lib/formats'
-import { appendToNote, createNote, getItem, importFiles, removeItem, touchItem, useItems } from './lib/library'
+import { appendToNote, createNote, discardDrafts, getItem, importFiles, removeItem, renameItem, touchItem, useItems } from './lib/library'
 import { DEFAULT_PREFS, loadLayout, saveLayout, usePrefs } from './lib/prefs'
 import type { DesktopFile, Layout, Pane } from './lib/types'
 
@@ -33,6 +33,15 @@ function addTabs(l: Layout, paneId: string, ids: string[]): Layout {
   }
 }
 
+/** Drops tabs whose item is gone, such as a draft note from the last session. */
+function pruned(l: Layout): Layout {
+  const panes = l.panes.map((p) => {
+    const tabs = p.tabs.filter((t) => getItem(t))
+    return { ...p, tabs, active: p.active && tabs.includes(p.active) ? p.active : (tabs[0] ?? null) }
+  })
+  return { ...l, panes }
+}
+
 function withoutTab(p: Pane, id: string): Pane {
   const i = p.tabs.indexOf(id)
   if (i < 0) return p
@@ -48,7 +57,7 @@ interface Toast {
 export default function App() {
   const items = useItems()
   const [prefs, setPrefs] = usePrefs()
-  const [layout, setLayout] = useState<Layout>(() => loadLayout(freshLayout()))
+  const [layout, setLayout] = useState<Layout>(() => pruned(loadLayout(freshLayout())))
   const [zen, setZen] = useState(false)
   const [ensoMoment, setEnsoMoment] = useState(false)
   const [libraryOpen, setLibraryOpen] = useState(false)
@@ -61,6 +70,9 @@ export default function App() {
   const openTarget = useRef<string | null>(null)
 
   useEffect(() => saveLayout(layout), [layout])
+
+  // A draft note closed without a word in it is simply gone.
+  useEffect(() => discardDrafts(new Set(layout.panes.flatMap((p) => p.tabs))), [layout])
 
   // Remember the note you were last writing in; quotes go there.
   useEffect(() => {
@@ -428,6 +440,7 @@ export default function App() {
                 setLayout((l) => ({ ...l, focused: pane.id, panes: l.panes.map((p) => (p.id === pane.id ? { ...p, active: id } : p)) }))
               }}
               onCloseTab={(id) => closeTab(pane.id, id)}
+              onRename={renameItem}
               onClosePane={() => closePane(pane.id)}
               onDropTab={(id, from) => moveTab(id, from, pane.id)}
               onDropFiles={(files) => handleFiles(files, pane.id)}

@@ -28,7 +28,7 @@ export function Library({ items, onOpen, onRemove, onClose, onOpenFile, onNewNot
   const sorted = useMemo(() => {
     const needle = q.trim().toLowerCase()
     return Object.values(items)
-      .filter((i) => !needle || i.title.toLowerCase().includes(needle))
+      .filter((i) => !i.draft && (!needle || i.title.toLowerCase().includes(needle)))
       .sort((a, b) => b.lastOpenedAt - a.lastOpenedAt)
   }, [items, q])
 
