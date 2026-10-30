@@ -1,6 +1,6 @@
 {
   "name": "stillpage",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "type": "module",
   "scripts": {
     "assets": "node scripts/copy-pdf-assets.mjs && node scripts/build-dictionary.mjs",

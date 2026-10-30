@@ -1,7 +1,7 @@
 # Maintainer: Sujay Rittikar <suj00rit20 at gmail dot com>
 pkgname=stillpage-bin
 _pkgname=stillpage
-pkgver=0.2.1
+pkgver=0.2.2
 pkgrel=1
 pkgdesc='A calm, distraction-free reader and notebook for PDFs, Office and LibreOffice files, EPUB and Markdown'
 arch=('x86_64')
@@ -17,7 +17,7 @@ install=$_pkgname.install
 source=("$url/releases/download/v$pkgver/Stillpage-$pkgver-amd64.deb"
         "LICENSE-$pkgver::https://raw.githubusercontent.com/sujayrittikar/stillpage/v$pkgver/LICENSE")
 noextract=("Stillpage-$pkgver-amd64.deb")
-sha256sums=('a93b4ad7c1299e8e8b07f02b615045543979acc93a6a69008e826c8bb7bb5b1c'
+sha256sums=('3e9f033233f87d8a5c17c12baee637128c6a0f1f9827e4d94031c08cdb0f8905'
             'b10bbc1e6fc9a4c4293a0950b5ad8f866d3961db825b2fb1f39c48d99d09312a')
 
 package() {
