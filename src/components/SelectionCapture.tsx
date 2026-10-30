@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react'
+import { lookupable } from '../lib/dictionary'
+import { wordAtSelection } from '../lib/words'
 import { Icon } from './Icon'
 
 export interface Capture {
@@ -46,17 +48,30 @@ export function SelectionCapture({ onCapture }: { onCapture: (c: Capture) => voi
   }, [])
 
   if (!pos) return null
+  const word = lookupable(pos.text)
   return (
-    <button
-      className="capture-btn"
-      style={{ left: pos.x, top: pos.y < 60 ? pos.y + 28 : pos.y - 46 }}
-      onClick={() => {
-        onCapture(pos)
-        window.getSelection()?.removeAllRanges()
-        setPos(null)
-      }}
-    >
-      <Icon name="quote" size={15} /> Add to note
-    </button>
+    <div className="capture-btn" style={{ left: pos.x, top: pos.y < 60 ? pos.y + 28 : pos.y - 46 }}>
+      <button
+        onClick={() => {
+          onCapture(pos)
+          window.getSelection()?.removeAllRanges()
+          setPos(null)
+        }}
+      >
+        <Icon name="quote" size={15} /> Add to note
+      </button>
+      {word && (
+        <button
+          title="Look it up (Ctrl D)"
+          onClick={() => {
+            const at = wordAtSelection()
+            setPos(null)
+            if (at) window.dispatchEvent(new CustomEvent('stillpage:define', { detail: at }))
+          }}
+        >
+          Define
+        </button>
+      )}
+    </div>
   )
 }

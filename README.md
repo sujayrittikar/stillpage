@@ -158,3 +158,5 @@ Contributions are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md).
 ## License
 
 [MIT](LICENSE). Stillpage is not affiliated with Spotify.
+
+The built-in English dictionary is [WordNet 3.0](https://wordnet.princeton.edu/), © 2006 Princeton University, used under the WordNet licence, which ships with the app.

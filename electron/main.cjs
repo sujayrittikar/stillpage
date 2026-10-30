@@ -180,6 +180,22 @@ function createWindow() {
       win?.webContents.toggleDevTools()
     }
   })
+  // Right-click: the renderer draws the menu, in the app's own style, from
+  // what Chromium knows about the spot (spelling suggestions included).
+  win.webContents.on('context-menu', (_event, params) => {
+    win?.webContents.send('context-menu', {
+      x: params.x,
+      y: params.y,
+      selectionText: params.selectionText,
+      misspelledWord: params.misspelledWord,
+      suggestions: params.dictionarySuggestions,
+      isEditable: params.isEditable,
+      canCut: params.editFlags.canCut,
+      canCopy: params.editFlags.canCopy,
+      canPaste: params.editFlags.canPaste,
+      canSelectAll: params.editFlags.canSelectAll,
+    })
+  })
   win.on('closed', () => {
     win = null
     spanned = false
@@ -662,6 +678,13 @@ ipcMain.handle('drm-status', async () => {
   } catch {
     return 'unavailable'
   }
+})
+ipcMain.handle('edit-action', (_event, action, word) => {
+  const contents = win?.webContents
+  if (!contents) return
+  if (action === 'replace' && typeof word === 'string') contents.replaceMisspelling(word)
+  else if (action === 'learn' && typeof word === 'string') contents.session.addWordToSpellCheckerDictionary(word)
+  else if (action === 'cut' || action === 'copy' || action === 'paste' || action === 'selectAll') contents[action]()
 })
 ipcMain.handle('span-screens', (_event, on) => setSpanned(on === undefined ? !spanned : Boolean(on)))
 ipcMain.handle('screen-info', () => ({ count: CAN_SPAN ? screen.getAllDisplays().length : 1, spanned }))

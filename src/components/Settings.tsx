@@ -17,6 +17,7 @@ const SHORTCUTS: [string, string][] = [
   ['Ctrl + / -', 'Bigger, smaller text (PDF: zoom)'],
   ['Ctrl Shift S', 'Span all screens'],
   ['F11', 'Full screen'],
+  ['Ctrl D', 'Look up a word (or right-click it)'],
   ['Alt W', 'Close tab'],
   ['Ctrl Tab', 'Next tab in pane'],
   ['Alt 1–4', 'Jump to pane'],
