@@ -83,6 +83,14 @@ export type Rendered =
   | { type: 'sheet'; sheets: Sheet[] }
   | { type: 'image'; url: string }
 
+/** A folder opened as a vault, as the main process found it. */
+export interface VaultScan {
+  root: string
+  name: string
+  files: { rel: string; size: number; mtime: number }[]
+  truncated: boolean
+}
+
 export interface DesktopFile {
   name: string
   path?: string
@@ -117,6 +125,18 @@ declare global {
       writeTextFile: (file: string, text: string, expectedMtime?: number, force?: boolean) => Promise<{ mtime?: number; conflict?: boolean; error?: string }>
       statFile: (file: string) => Promise<{ mtime: number; size: number } | null>
       readFiles: (files: string[]) => Promise<DesktopFile[]>
+      pickFolder: () => Promise<string | null>
+      takePendingFolder: () => Promise<string | null>
+      onOpenFolder: (cb: (folder: string) => void) => () => void
+      vault: {
+        open: (root: string | null) => Promise<VaultScan | null>
+        scan: () => Promise<VaultScan | null>
+        create: (dir: string, name: string, text: string) => Promise<string | null>
+        rename: (file: string, name: string) => Promise<string | { error: string } | null>
+        trash: (file: string) => Promise<boolean>
+        reveal: (file: string) => Promise<void>
+        onChanged: (cb: () => void) => () => void
+      }
     }
   }
 }

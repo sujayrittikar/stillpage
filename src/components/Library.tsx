@@ -1,7 +1,9 @@
 import { useMemo, useState } from 'react'
 import { FORMAT_LABEL } from '../lib/formats'
 import type { Item } from '../lib/types'
+import { closeVault, useVault } from '../lib/vault'
 import { Icon } from './Icon'
+import { VaultTree } from './VaultTree'
 
 function ago(ts: number): string {
   const m = Math.round((Date.now() - ts) / 60000)
@@ -21,10 +23,20 @@ interface Props {
   onClose: () => void
   onOpenFile: () => void
   onNewNote: () => void
+  /** Opens a file from the folder by its path. */
+  onOpenPath: (file: string) => void
+  onOpenFolder: () => void
+  onNewFolderNote: (name: string) => void
 }
 
-export function Library({ items, onOpen, onRemove, onClose, onOpenFile, onNewNote }: Props) {
+export function Library(props: Props) {
+  const { items, onOpen, onRemove, onClose, onOpenFile, onNewNote } = props
   const [q, setQ] = useState('')
+  const vault = useVault()
+  const [tab, setTab] = useState<'folder' | 'library'>('folder')
+  const showFolder = Boolean(vault) && tab === 'folder'
+  const [naming, setNaming] = useState(false)
+  const openPaths = useMemo(() => new Set(Object.values(items).flatMap((i) => (i.path ? [i.path] : []))), [items])
   const sorted = useMemo(() => {
     const needle = q.trim().toLowerCase()
     return Object.values(items)
@@ -37,15 +49,39 @@ export function Library({ items, onOpen, onRemove, onClose, onOpenFile, onNewNot
       <div className="scrim" onClick={onClose} />
       <aside className="library" aria-label="Library">
         <div className="library-head">
-          <h2>Library</h2>
+          {vault ? (
+            <div className="library-tabs" role="tablist">
+              <button role="tab" aria-selected={showFolder} className={showFolder ? 'on' : ''} onClick={() => setTab('folder')} title={vault.root}>
+                {vault.name}
+              </button>
+              <button role="tab" aria-selected={!showFolder} className={!showFolder ? 'on' : ''} onClick={() => setTab('library')}>
+                Library
+              </button>
+            </div>
+          ) : (
+            <h2>Library</h2>
+          )}
           <button className="icon-btn" onClick={onClose} aria-label="Close library">
             <Icon name="close" size={16} />
           </button>
         </div>
         <label className="search">
           <Icon name="search" size={16} />
-          <input autoFocus placeholder="Find a note or document" value={q} onChange={(e) => setQ(e.target.value)} />
+          <input autoFocus placeholder={showFolder ? `Find in ${vault!.name}` : 'Find a note or document'} value={q} onChange={(e) => setQ(e.target.value)} />
         </label>
+        {showFolder ? (
+          <div className="library-actions">
+            <button className="btn small" onClick={() => setNaming(true)}>
+              <Icon name="note" size={15} /> New note here
+            </button>
+            <button className="icon-btn" title="Show the folder in your file manager" onClick={() => void window.stillpage?.vault.reveal(vault!.root)}>
+              <Icon name="open" size={15} />
+            </button>
+            <button className="icon-btn" title="Close this folder" onClick={() => void closeVault()}>
+              <Icon name="close" size={15} />
+            </button>
+          </div>
+        ) : (
         <div className="library-actions">
           <button className="btn small" onClick={onOpenFile}>
             <Icon name="open" size={15} /> Open a file
@@ -53,7 +89,31 @@ export function Library({ items, onOpen, onRemove, onClose, onOpenFile, onNewNot
           <button className="btn small quiet" onClick={onNewNote}>
             <Icon name="note" size={15} /> New note
           </button>
+          {window.stillpage?.pickFolder && (
+            <button className="btn small quiet" onClick={props.onOpenFolder} title="Open a folder of notes and documents (Ctrl Shift O)">
+              <Icon name="library" size={15} /> Open a folder
+            </button>
+          )}
         </div>
+        )}
+        {showFolder && naming && (
+          <form
+            className="vault-new"
+            onSubmit={(e) => {
+              e.preventDefault()
+              const name = new FormData(e.currentTarget).get('name')
+              setNaming(false)
+              props.onNewFolderNote(String(name ?? '').trim() || 'Untitled')
+            }}
+          >
+            <input name="name" autoFocus placeholder="Name the note" aria-label="Note name" onKeyDown={(e) => e.key === 'Escape' && (e.stopPropagation(), setNaming(false))} onBlur={() => setNaming(false)} />
+          </form>
+        )}
+        {showFolder ? (
+          <div className="library-list">
+            <VaultTree vault={vault!} query={q} open={openPaths} onOpen={props.onOpenPath} />
+          </div>
+        ) : (
         <div className="library-list">
           {(['note', 'doc'] as const).map((kind) => {
             const list = sorted.filter((i) => i.kind === kind)
@@ -86,6 +146,7 @@ export function Library({ items, onOpen, onRemove, onClose, onOpenFile, onNewNot
           })}
           {sorted.length === 0 && <p className="lib-empty">{q ? 'Nothing matches that.' : 'Files you open and notes you write appear here.'}</p>}
         </div>
+        )}
       </aside>
     </>
   )

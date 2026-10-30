@@ -116,6 +116,20 @@ export async function setDocText(id: string, text: string, mtime?: number) {
   persist()
 }
 
+/** A file moved or renamed on disk: the documents that point at it follow. */
+export function renamePath(from: string, to: string) {
+  let moved = false
+  for (const item of Object.values(items)) {
+    if (item.path !== from) continue
+    const name = to.split('/').pop() ?? item.title
+    items[item.id] = { ...item, path: to, title: name.replace(/\.[^.]+$/, ''), ext: extOf(name) }
+    moved = true
+  }
+  if (!moved) return
+  emit()
+  persist()
+}
+
 /** Reads a document that lives on disk again if it changed there. Returns
  *  true when it did. */
 export async function refreshFromDisk(id: string): Promise<boolean> {
