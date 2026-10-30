@@ -6,7 +6,7 @@
 
 <p align="center">
   A calm desktop reader and notebook for Linux.<br>
-  Open a PDF, a Word file, a deck or a spreadsheet, write notes beside it, and keep your music playing. All in one window.
+  Open a PDF, a Word file, a deck or a folder of notes, write beside it, and keep your music playing. All in one window.
 </p>
 
 <p align="center">
@@ -21,9 +21,14 @@ Studying usually means one app for the PDF, another for notes, a browser tab for
 
 - **Reads almost anything**: PDF, Word, PowerPoint and Excel, LibreOffice documents, presentations and spreadsheets (`.odt`, `.odp`, `.ods`, and the flat `.fodt`/`.fodp`/`.fods`), CSV and TSV, EPUB, Markdown, Jupyter notebooks, RTF, HTML, plain text, images, and source code in about 50 languages. Headings, lists, footnotes, tables, links and speaker notes all come through.
 - **Reading view or the original pages**: Word, PowerPoint and LibreOffice files open reflowed in your theme and text size. One click on **Original** shows the pages exactly as the author laid them out, and you can still select and quote from them. If [LibreOffice](https://www.libreoffice.org) is installed, Stillpage also opens old `.doc` and `.ppt` files, drawings (`.odg`), Visio, Publisher, WordPerfect, Pages and Keynote files the same way. Without it, those files tell you the one command that installs it.
+- **Your folders, as they are**: open any folder of notes and documents (**Open a folder** in the library, `Ctrl Shift O`, drop a folder on the window, or `stillpage ~/notes`). Everything Stillpage can read appears as a tree that follows the disk, and nothing has to be added by hand. New notes you make there are plain `.md` files, so the folder stays yours to sync with Git or Syncthing. Rename files, move them to the trash, and press `Ctrl P` to jump to any note or file by typing a few letters.
+- **Edit files in place**: Markdown, text, HTML and source files have **Read** and **Edit** modes. Edits save straight back to the file as you type, and Stillpage asks before overwriting a file that another program has changed. Markdown is written like a page, with tables and formulas, or edited as **Source**. Code opens in a quiet editor with syntax colours.
 - **Two screens, one window**: `Ctrl Shift S` turns Stillpage into one full-screen window across every monitor, with the pane divider on the bezel. Press it again to go back.
-- **Split panes with tabs**: up to four side-by-side panes, each with its own tabs. Drag tabs between panes, resize the dividers, and drop files from your file manager straight into a pane.
-- **Notes beside the source**: write the way you read. Type `# ` for a heading, `- ` for a list, `[ ] ` for a checklist or `**bold**`, and it turns into the real thing with no symbols left behind. Select text for a small formatting bar. Notes save as you type (as Markdown underneath) and export to PDF or Markdown. Select a passage in any document and choose **Add to note** to quote it, page number included.
+- **Split panes with tabs**: up to four side-by-side panes, each with its own tabs. Drag tabs between panes and drop files from your file manager straight into a pane. Drag a divider and each pane's text and PDF zoom adjust to its new width.
+- **Notes beside the source**: write the way you read. Type `# ` for a heading, `- ` for a list, `[ ] ` for a checklist or `**bold**`, and it turns into the real thing with no symbols left behind. Select text for a small formatting bar. Notes save as you type (as Markdown underneath) and export to PDF or Markdown. A new note is only kept once you write in it or name it; double-click a note's tab to rename it. Select a passage in any document and choose **Add to note** to quote it, page number included.
+- **Formulas**: press `Ctrl M` in a note for an inline formula, or `Ctrl Shift M` for one on its own line. The formula editor shows a live preview and offers command completion, a symbol palette (fractions, integrals, matrices, Greek, arrows and more) and blanks you fill in with `Tab`. Click a formula to edit it. Markdown files and Jupyter notebooks render `$…$` and `$$…$$` too, and formulas survive PDF export.
+- **Dictionaries, offline**: right-click a word, press `Ctrl D`, or choose **Define** on a selection. English (WordNet) gives definitions, examples and synonyms; in a note, click a synonym to put it in place of the word. Japanese (JMdict) finds the dictionary form of what you point at, so 食べさせられた looks up 食べる.
+- **Spelling and autocorrect**: right-click a misspelled word for suggestions or to add it to the dictionary. Common typos are fixed as you write ("teh" → the, "dont" → don't); press `Backspace` straight after a fix to undo it. Autocorrect can be turned off in reading settings.
 - **Zen mode** (`Ctrl .`): the chrome fades away and only the text remains. Move the pointer to the top edge to get the toolbar back.
 - **Typography you control**: Literata or Figtree, text size, line length and spacing. Four themes: Stone, Linen, Mist and Dusk, a soft dim theme that is not pitch black. PDF pages can take on the theme's paper tone.
 - **Spotify built in**: paste a playlist link into the small pill in the corner and it plays inside the app. With Premium you can also connect Spotify and control it on your phone or desktop.
@@ -70,7 +75,7 @@ sha256sum -c SHA256SUMS --ignore-missing
 sudo pacman -U ./stillpage-bin-*-x86_64.pkg.tar.zst
 ```
 
-For the original page layout and older Office formats, also install LibreOffice: `sudo pacman -S libreoffice-fresh`. An AUR package, `stillpage-bin`, is on its way.
+For the original page layout and older Office formats, also install LibreOffice: `sudo pacman -S libreoffice-fresh`. An AUR package, `stillpage-bin`, will follow once AUR registration reopens.
 
 **Any other distro**: use the AppImage.
 
@@ -110,6 +115,8 @@ Good to know:
 | Keys | Action |
 | --- | --- |
 | `Ctrl O` | Open files |
+| `Ctrl Shift O` | Open a folder |
+| `Ctrl P` | Find any note, document or file in the folder |
 | `Alt N` | New note beside the current document |
 | `Ctrl \` | Split the workspace |
 | `Ctrl .` | Zen mode (`Esc` to leave) |
@@ -120,6 +127,9 @@ Good to know:
 | `Ctrl Tab` | Next tab in the pane |
 | `Alt 1`–`4` | Jump to a pane |
 | `Ctrl B`, `Ctrl I`, `Ctrl U` | Bold, italic, underline in notes |
+| `Ctrl M`, `Ctrl Shift M` | Inline formula, formula on its own line |
+| `Ctrl D` | Look up the word at the cursor or selection |
+| `F2` | Rename a file in the folder tree |
 | `Ctrl` + scroll | Zoom a PDF |
 
 ## Develop
@@ -134,13 +144,17 @@ npm run dev        # Vite + Electron with hot reload
 npm run dist       # builds release/*.deb and release/*.AppImage
 ```
 
+`npm run dev` and `npm run build` first build the dictionaries into `public/dict` (`scripts/build-dictionary.mjs`). The English one comes from an npm package. The Japanese dictionary and the autocorrect list are downloaded once from pinned, checksummed addresses and cached in `node_modules/.cache`. Without a network connection the build still works, just without those two.
+
 The project layout:
 
 ```
-electron/          main process: window, app:// protocol, "Open with", Spotify login window
+electron/          main process: window, app:// protocol, "Open with", file saving, folder watching, Spotify login
 src/lib/parse/     one small parser per format, loaded on demand
 src/lib/render.ts  picks a parser and caches the result so panes share it
-src/components/    panes, viewers, notes editor, music dock
+src/lib/           library, folders (vault.ts), formulas, dictionaries, autocorrect
+src/components/    panes, viewers, note and file editors, dictionary card, music dock
+scripts/           build helpers, including the dictionary builder
 ```
 
 Every document is parsed in the renderer and sanitised with DOMPurify before display. Documents never get to run scripts or bring their own styles, so everything reads in Stillpage's typography.
@@ -148,10 +162,10 @@ Every document is parsed in the renderer and sanitised with DOMPurify before dis
 ## Roadmap
 
 - Highlights and annotations stored per document
-- Search across the whole library
-- Math (KaTeX) in Markdown notes
+- Full-text search across the library and the open folder
+- Links between notes (`[[wiki links]]`) and backlinks
 - Flatpak and `.rpm` builds
-- Folder of notes on disk, for syncing with Git or Syncthing
+- `stillpage-bin` on the AUR, once registration reopens
 
 Contributions are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md).
 
