@@ -35,6 +35,13 @@ const CAN_SPAN =
   Boolean(process.env.DISPLAY) &&
   (process.env.XDG_SESSION_TYPE !== 'wayland' || app.commandLine.getSwitchValue('ozone-platform') === 'x11')
 
+// Spotify streams every song (10-16 MB each) through the browser cache, which
+// otherwise grows by hundreds of MB. Past this size Chromium drops the least
+// recently used entries as it writes; the app itself is served from disk, so
+// none of its own files depend on the cache.
+const CACHE_LIMIT = 64 * 1024 * 1024
+app.commandLine.appendSwitch('disk-cache-size', String(CACHE_LIMIT))
+
 protocol.registerSchemesAsPrivileged([
   { scheme: 'app', privileges: { standard: true, secure: true, supportFetchAPI: true, stream: true, codeCache: true } },
 ])
@@ -786,6 +793,13 @@ app.whenReady().then(async () => {
   pendingPaths.push(...filesFromArgv(process.argv))
   pendingFolder = folderFromArgv(process.argv)
   createWindow()
+
+  // Versions before the limit could leave a much larger cache behind; clear
+  // it once in the background rather than wait for eviction to catch up.
+  session.defaultSession
+    .getCacheSize()
+    .then((size) => size > CACHE_LIMIT && session.defaultSession.clearCache())
+    .catch(() => {})
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
