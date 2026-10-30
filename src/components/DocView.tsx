@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useRef, useState, type ReactNode } from 'react'
-import { EDITABLE } from '../lib/files'
+import { EDITABLE, EDITABLE_DOCUMENTS } from '../lib/files'
 import { HAS_ORIGINAL, kindName } from '../lib/formats'
 import { refreshFromDisk } from '../lib/library'
 import { NeedsOffice, renderItem } from '../lib/render'
@@ -12,6 +12,7 @@ import { SlidesViewer } from './viewers/SlidesViewer'
 
 const PdfViewer = lazy(() => import('./viewers/PdfViewer'))
 const FileEditor = lazy(() => import('./FileEditor').then((m) => ({ default: m.FileEditor })))
+const DocumentEditor = lazy(() => import('./DocumentEditor').then((m) => ({ default: m.DocumentEditor })))
 
 /** Reading a text file, or editing it: as a page (Markdown) or as text. */
 type Mode = 'read' | 'edit' | 'source'
@@ -122,7 +123,10 @@ export function DocView({ item, prefs }: { item: Item; prefs: Prefs }) {
   const [view, setViewState] = useState<View>(() => readView(item.id))
   const [mode, setModeState] = useState<Mode>(() => readMode(item.id))
   const editable = EDITABLE.has(item.format!)
-  const editing = editable && mode !== 'read'
+  // Word and LibreOffice documents are edited as a page and saved in their
+  // own format. Only on the desktop, where there's a file to save to.
+  const docEditable = EDITABLE_DOCUMENTS.has(item.ext ?? '') && Boolean(window.stillpage?.writeDocument)
+  const editing = (editable || docEditable) && mode !== 'read'
 
   const setMode = (m: Mode) => {
     setModeState(m)
@@ -193,18 +197,46 @@ export function DocView({ item, prefs }: { item: Item; prefs: Prefs }) {
     </div>
   )
 
+  // Documents: read reflowed, see the original pages, or edit.
+  const docSwitch = docEditable && (
+    <div className="view-switch segmented" role="radiogroup" aria-label="How to show this document">
+      {(['reading', 'original', 'edit'] as const)
+        .filter((o) => o !== 'original' || switchable)
+        .map((o) => {
+          const on = o === 'edit' ? mode === 'edit' : mode !== 'edit' && effective === o
+          return (
+            <button
+              key={o}
+              role="radio"
+              aria-checked={on}
+              className={on ? 'on' : ''}
+              onClick={() => {
+                if (o === 'edit') return setMode('edit')
+                setMode('read')
+                setView(o)
+              }}
+              title={o === 'reading' ? 'Reflowed in your theme and text size' : o === 'original' ? 'The pages as the author laid them out' : 'Write in it; saves back to the file'}
+            >
+              <Icon name={o === 'reading' ? 'read' : o === 'original' ? 'page' : 'note'} size={14} />
+              <span>{o === 'reading' ? 'Reading' : o === 'original' ? 'Original' : 'Edit'}</span>
+            </button>
+          )
+        })}
+    </div>
+  )
+
   if (editing) {
     return (
       <div className="doc doc-edit" data-capture-source={item.title}>
-        {modeSwitch}
+        {docSwitch || modeSwitch}
         <Suspense fallback={<Loading />}>
-          <FileEditor key={`${item.id}:${mode}`} item={item} mode={mode === 'edit' ? 'page' : 'source'} />
+          {docEditable ? <DocumentEditor key={item.id} item={item} /> : <FileEditor key={`${item.id}:${mode}`} item={item} mode={mode === 'edit' ? 'page' : 'source'} />}
         </Suspense>
       </div>
     )
   }
 
-  const switcher = (switchable && (
+  const switcher = docSwitch || (switchable && (
     <div className="view-switch segmented" role="radiogroup" aria-label="How to show this document">
       {(['reading', 'original'] as View[]).map((v) => (
         <button

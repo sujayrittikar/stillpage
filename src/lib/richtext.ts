@@ -3,6 +3,7 @@ import StarterKit from '@tiptap/starter-kit'
 import { Markdown } from '@tiptap/markdown'
 import { TaskItem, TaskList } from '@tiptap/extension-list'
 import { TableKit } from '@tiptap/extension-table'
+import { Image } from '@tiptap/extension-image'
 import { Placeholder } from '@tiptap/extensions'
 import { Plugin } from '@tiptap/pm/state'
 import { BlockMath, InlineMath } from '@tiptap/extension-mathematics'
@@ -55,9 +56,11 @@ const Formulas = Extension.create({
 
 /** Everything a page of writing understands, stored as Markdown: headings,
  *  lists, checklists, quotes, tables and formulas. */
-export function richExtensions(placeholder: string) {
+export function richExtensions(placeholder: string, { images = false } = {}) {
   return [
     StarterKit.configure({ link: { openOnClick: false, autolink: true } }),
+    // Documents carry their pictures; notes don't take pasted ones.
+    ...(images ? [Image.configure({ inline: true, allowBase64: true })] : []),
     TaskList,
     TaskItem.configure({ nested: true }),
     TableKit.configure({ table: { resizable: false } }),

@@ -146,6 +146,8 @@ declare global {
       readTextFile: (file: string) => Promise<{ text?: string; mtime?: number; error?: string }>
       writeTextFile: (file: string, text: string, expectedMtime?: number, force?: boolean) => Promise<{ mtime?: number; conflict?: boolean; error?: string }>
       statFile: (file: string) => Promise<{ mtime: number; size: number } | null>
+      writeDocument: (file: string, data: Uint8Array, expectedMtime?: number, force?: boolean) => Promise<{ mtime?: number; conflict?: boolean; error?: string; backup?: string | null }>
+      showBackups: () => Promise<string>
       readFiles: (files: string[]) => Promise<DesktopFile[]>
       pickFolder: () => Promise<string | null>
       takePendingFolder: () => Promise<string | null>
