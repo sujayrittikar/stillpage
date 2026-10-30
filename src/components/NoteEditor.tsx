@@ -2,11 +2,14 @@ import { useEffect, useRef, useState } from 'react'
 import { EditorContent, useEditorState } from '@tiptap/react'
 import { getItem, setNote, useNote } from '../lib/library'
 import { tidyMarkdown, withMath } from '../lib/richtext'
+import { moveNoteToVault, useVault } from '../lib/vault'
 import { Icon } from './Icon'
 import { useRichEditor } from './RichText'
 
 const announce = (saved: string | null) =>
   saved && window.dispatchEvent(new CustomEvent('stillpage:toast', { detail: `Saved ${saved.split('/').pop()}` }))
+
+const announceText = (text: string) => window.dispatchEvent(new CustomEvent('stillpage:toast', { detail: text }))
 
 const fileName = (id: string) => (getItem(id)?.title ?? 'note').replace(/[\\/:*?"<>|]/g, '-')
 
@@ -15,6 +18,7 @@ const fileName = (id: string) => (getItem(id)?.title ?? 'note').replace(/[\\/:*?
 export function NoteEditor({ id, active }: { id: string; active: boolean }) {
   const text = useNote(id)
   const [menu, setMenu] = useState(false)
+  const vault = useVault()
   const scroller = useRef<HTMLDivElement>(null)
 
   const { editor, overlay } = useRichEditor({
@@ -55,6 +59,15 @@ export function NoteEditor({ id, active }: { id: string; active: boolean }) {
     else window.print()
   }
 
+  // The note becomes a .md file in the open folder and its tab follows.
+  const moveToFolder = async () => {
+    setMenu(false)
+    const moved = await moveNoteToVault(id)
+    if (!moved) return announceText('The note could not be moved into the folder.')
+    window.dispatchEvent(new CustomEvent('stillpage:replace-tab', { detail: { from: id, to: moved.id } }))
+    announceText(`Moved to ${moved.file.split('/').slice(-2).join('/')}`)
+  }
+
   return (
     <div className="note">
       <div className="note-bar">
@@ -73,6 +86,11 @@ export function NoteEditor({ id, active }: { id: string; active: boolean }) {
                 <button className="menu-item" onClick={() => void exportMarkdown()}>
                   Export as Markdown
                 </button>
+                {vault && (
+                  <button className="menu-item" onClick={() => void moveToFolder()} title={`Save this note as a Markdown file in ${vault.root}`}>
+                    Move into {vault.name}
+                  </button>
+                )}
               </div>
             </>
           )}

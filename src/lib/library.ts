@@ -203,6 +203,8 @@ export async function removeItem(id: string) {
   const item = items[id]
   if (!item) return
   delete items[id]
+  // A save still waiting would write the note back after it's gone.
+  window.clearTimeout(saveTimers.get(id))
   emit()
   persist()
   await db.del(item.kind === 'note' ? 'note:' + id : 'blob:' + id)
