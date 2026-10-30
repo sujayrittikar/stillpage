@@ -159,7 +159,13 @@ export async function api<T = unknown>(path: string, init: RequestInit = {}): Pr
   })
   if (res.status === 204 || res.status === 202) return null
   const text = await res.text()
-  const body = text ? JSON.parse(text) : null
+  // Player commands can answer 200 with a bare id rather than JSON or 204.
+  let body = null
+  try {
+    body = text ? JSON.parse(text) : null
+  } catch {
+    if (res.ok) return null
+  }
   if (!res.ok) {
     const reason = body?.error?.reason
     const message =
