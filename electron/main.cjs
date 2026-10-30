@@ -48,6 +48,8 @@ if (!app.requestSingleInstanceLock()) {
 let win = null
 /** Files requested before the renderer was ready to receive them. */
 let pendingPaths = []
+/** A folder asked for before the renderer was ready. */
+let pendingFolder = null
 let rendererReady = false
 
 function filesFromArgv(argv) {
@@ -63,6 +65,22 @@ function filesFromArgv(argv) {
         return false
       }
     })
+}
+
+/** A folder named on the command line (`stillpage ~/notes`) opens as the vault. */
+function folderFromArgv(argv) {
+  const dirs = argv
+    .slice(1)
+    .filter((arg) => !arg.startsWith('-') && arg !== '.' && path.resolve(arg) !== app.getAppPath())
+    .map((arg) => path.resolve(arg))
+    .filter((p) => {
+      try {
+        return fs.statSync(p).isDirectory()
+      } catch {
+        return false
+      }
+    })
+  return dirs.at(-1) ?? null
 }
 
 function readFiles(paths) {
@@ -404,6 +422,130 @@ ipcMain.handle('write-text-file', (_event, file, text, expectedMtime, force) => 
   }
 })
 
+// ---------- Folders (vaults) ----------
+// Open a folder and everything readable in it is there to open, kept up to
+// date as files come and go. Stillpage only reads the folder, except for
+// what you do on purpose: new notes, renames, and moving files to the trash.
+
+const SKIP_DIRS = new Set(['node_modules', '__pycache__', 'venv', '.venv', 'target', 'dist', 'build'])
+const MAX_VAULT_FILES = 20000
+let vault = null
+let vaultWatcher = null
+let vaultTimer = null
+
+const isHidden = (name) => name.startsWith('.')
+const insideVault = (file) => vault && typeof file === 'string' && path.isAbsolute(file) && path.resolve(file).startsWith(vault + path.sep)
+
+async function scanVault(root) {
+  const files = []
+  const walk = async (dir, depth) => {
+    if (files.length >= MAX_VAULT_FILES || depth > 12) return
+    let entries
+    try {
+      entries = await fs.promises.readdir(dir, { withFileTypes: true })
+    } catch {
+      return
+    }
+    for (const entry of entries) {
+      if (isHidden(entry.name) || files.length >= MAX_VAULT_FILES) continue
+      const full = path.join(dir, entry.name)
+      if (entry.isDirectory()) {
+        if (!SKIP_DIRS.has(entry.name)) await walk(full, depth + 1)
+      } else if (entry.isFile()) {
+        try {
+          const stat = await fs.promises.stat(full)
+          files.push({ rel: path.relative(root, full), size: stat.size, mtime: stat.mtimeMs })
+        } catch {}
+      }
+    }
+  }
+  await walk(root, 0)
+  return { root, name: path.basename(root), files, truncated: files.length >= MAX_VAULT_FILES }
+}
+
+function watchVault(root) {
+  vaultWatcher?.close()
+  vaultWatcher = null
+  vault = root
+  if (!root) return
+  try {
+    vaultWatcher = fs.watch(root, { recursive: true }, (_type, name) => {
+      // Our own save files, and anything hidden, aren't news.
+      if (name && String(name).split(path.sep).some(isHidden)) return
+      clearTimeout(vaultTimer)
+      vaultTimer = setTimeout(() => win?.webContents.send('vault-changed', root), 250)
+    })
+    vaultWatcher.on('error', () => {})
+  } catch {}
+}
+
+/** A name for a new file that doesn't clash with one already there. */
+function freeName(dir, base, ext) {
+  for (let n = 1; n < 1000; n++) {
+    const name = n === 1 ? `${base}${ext}` : `${base} ${n}${ext}`
+    if (!fs.existsSync(path.join(dir, name))) return path.join(dir, name)
+  }
+  return path.join(dir, `${base} ${Date.now()}${ext}`)
+}
+
+// Control characters too: they can't be typed, only pasted by accident.
+// eslint-disable-next-line no-control-regex
+const cleanName = (name) => String(name).replace(/[\\/:*?"<>|\u0000-\u001f]/g, '-').trim().replace(/^\.+/, '').trim().slice(0, 120)
+
+ipcMain.handle('pick-folder', async () => {
+  const result = await dialog.showOpenDialog(win, { properties: ['openDirectory'], title: 'Open a folder' })
+  return result.canceled ? null : result.filePaths[0]
+})
+
+ipcMain.handle('vault-open', async (_event, root) => {
+  if (root === null) {
+    watchVault(null)
+    return null
+  }
+  try {
+    if (typeof root !== 'string' || !path.isAbsolute(root) || !fs.statSync(root).isDirectory()) return null
+  } catch {
+    return null
+  }
+  const real = fs.realpathSync(root)
+  watchVault(real)
+  return scanVault(real)
+})
+
+ipcMain.handle('vault-scan', () => (vault ? scanVault(vault) : null))
+
+ipcMain.handle('vault-create', (_event, dir, name, text) => {
+  const folder = dir ? path.resolve(vault ?? '', dir) : vault
+  if (!vault || (folder !== vault && !insideVault(folder))) return null
+  const base = cleanName(name) || 'Untitled'
+  const ext = /\.(md|markdown|txt)$/i.exec(base)?.[0] ?? '.md'
+  const file = freeName(folder, base.endsWith(ext) ? base.slice(0, -ext.length) : base, ext)
+  fs.writeFileSync(file, typeof text === 'string' ? text : '', { flag: 'wx' })
+  return file
+})
+
+ipcMain.handle('vault-rename', (_event, file, name) => {
+  if (!insideVault(file)) return null
+  const clean = cleanName(name)
+  if (!clean) return null
+  const ext = path.extname(file)
+  const target = path.join(path.dirname(file), clean.toLowerCase().endsWith(ext.toLowerCase()) ? clean : clean + ext)
+  if (target === file) return file
+  if (fs.existsSync(target)) return { error: 'There is already a file with that name.' }
+  fs.renameSync(file, target)
+  return target
+})
+
+ipcMain.handle('vault-trash', async (_event, file) => {
+  if (!insideVault(file)) return false
+  await shell.trashItem(file)
+  return true
+})
+
+ipcMain.handle('vault-reveal', (_event, file) => {
+  if (insideVault(file) || file === vault) shell.showItemInFolder(file)
+})
+
 // ---------- LibreOffice ----------
 // Old Word/PowerPoint files, drawings, Pages, Keynote and friends have no
 // browser-side reader; LibreOffice can draw any of them as PDF pages. We use
@@ -496,6 +638,11 @@ ipcMain.handle('convert-to-pdf', async (_event, name, data) => {
   }
 })
 
+ipcMain.handle('take-pending-folder', () => {
+  const folder = pendingFolder
+  pendingFolder = null
+  return folder
+})
 ipcMain.handle('take-pending-files', () => {
   rendererReady = true
   const paths = pendingPaths
@@ -524,6 +671,8 @@ ipcMain.handle('open-external', (_event, url) => {
 
 app.on('second-instance', (_event, argv) => {
   openPaths(filesFromArgv(argv))
+  const folder = folderFromArgv(argv)
+  if (folder) win?.webContents.send('open-folder', folder)
   if (win) {
     if (win.isMinimized()) win.restore()
     win.focus()
@@ -563,6 +712,7 @@ app.whenReady().then(async () => {
   })
 
   pendingPaths.push(...filesFromArgv(process.argv))
+  pendingFolder = folderFromArgv(process.argv)
   createWindow()
 
   app.on('activate', () => {

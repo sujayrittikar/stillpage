@@ -9,6 +9,8 @@ const THEMES: { id: ThemeName; name: string }[] = [
 
 const SHORTCUTS: [string, string][] = [
   ['Ctrl O', 'Open files'],
+  ['Ctrl Shift O', 'Open a folder'],
+  ['Ctrl P', 'Find any note or file'],
   ['Alt N', 'New note beside'],
   ['Ctrl \\', 'Split the workspace'],
   ['Ctrl .', 'Zen mode'],

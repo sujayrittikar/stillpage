@@ -33,4 +33,24 @@ contextBridge.exposeInMainWorld('stillpage', {
   writeTextFile: (file, text, expectedMtime, force) => ipcRenderer.invoke('write-text-file', file, text, expectedMtime, force),
   statFile: (file) => ipcRenderer.invoke('stat-file', file),
   readFiles: (files) => ipcRenderer.invoke('read-files', files),
+  pickFolder: () => ipcRenderer.invoke('pick-folder'),
+  takePendingFolder: () => ipcRenderer.invoke('take-pending-folder'),
+  onOpenFolder: (callback) => {
+    const listener = (_event, folder) => callback(folder)
+    ipcRenderer.on('open-folder', listener)
+    return () => ipcRenderer.removeListener('open-folder', listener)
+  },
+  vault: {
+    open: (root) => ipcRenderer.invoke('vault-open', root),
+    scan: () => ipcRenderer.invoke('vault-scan'),
+    create: (dir, name, text) => ipcRenderer.invoke('vault-create', dir, name, text),
+    rename: (file, name) => ipcRenderer.invoke('vault-rename', file, name),
+    trash: (file) => ipcRenderer.invoke('vault-trash', file),
+    reveal: (file) => ipcRenderer.invoke('vault-reveal', file),
+    onChanged: (callback) => {
+      const listener = () => callback()
+      ipcRenderer.on('vault-changed', listener)
+      return () => ipcRenderer.removeListener('vault-changed', listener)
+    },
+  },
 })

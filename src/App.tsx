@@ -6,6 +6,8 @@ import { PaneView } from './components/PaneView'
 import { SelectionCapture, type Capture } from './components/SelectionCapture'
 import { Settings } from './components/Settings'
 import { SpotifyDock } from './components/SpotifyDock'
+import { QuickOpen } from './components/QuickOpen'
+import { itemForFile, newVaultNote, openVault, startVault, useVault } from './lib/vault'
 import { uid } from './lib/db'
 import { ACCEPT } from './lib/formats'
 import { appendToNote, createNote, discardDrafts, getItem, importFiles, removeItem, renameItem, touchItem, useItems } from './lib/library'
@@ -62,6 +64,8 @@ export default function App() {
   const [ensoMoment, setEnsoMoment] = useState(false)
   const [libraryOpen, setLibraryOpen] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [quickOpen, setQuickOpen] = useState(false)
+  const vault = useVault()
   const [screens, setScreens] = useState({ count: 1, spanned: false })
   const [toasts, setToasts] = useState<Toast[]>([])
   const fileInput = useRef<HTMLInputElement>(null)
@@ -142,15 +146,58 @@ export default function App() {
     })
   }, [])
 
+  /** Opens a folder as the vault and shows it. */
+  const showFolder = useCallback(
+    async (folder: string) => {
+      if (await openVault(folder)) {
+        setLibraryOpen(true)
+        toast(`Opened ${folder.split('/').pop()}`)
+      } else toast('That folder could not be opened.')
+    },
+    [toast],
+  )
+
   const handleFiles = useCallback(
     async (files: File[], paneId?: string, paths?: (string | undefined)[]) => {
       if (!files.length) return
+      // A folder dropped on the window opens as the vault.
+      const bridge = window.stillpage
+      const folder = bridge?.pathForFile && files.length === 1 && !files[0].type && !/\.[^./]+$/.test(files[0].name) ? bridge.pathForFile(files[0]) : ''
+      if (folder && !(await bridge?.statFile(folder))) return void showFolder(folder)
       const { ids, rejected } = await importFiles(files, paths)
       rejected.forEach(toast)
       openItems(ids, paneId)
     },
+    [openItems, toast, showFolder],
+  )
+
+  /** Opens a file from the vault, bringing it into the library the first time. */
+  const openPath = useCallback(
+    async (file: string, paneId?: string) => {
+      const id = await itemForFile(file)
+      if (id) openItems([id], paneId)
+      else toast('That file is no longer there.')
+    },
     [openItems, toast],
   )
+
+  const pickFolder = useCallback(async () => {
+    const folder = await window.stillpage?.pickFolder()
+    if (folder) void showFolder(folder)
+  }, [showFolder])
+
+  // A folder from the command line, or one from last time.
+  useEffect(() => {
+    const bridge = window.stillpage
+    const stop = startVault()
+    if (!bridge?.takePendingFolder) return stop
+    void bridge.takePendingFolder().then((folder) => folder && void showFolder(folder))
+    const off = bridge.onOpenFolder((folder) => void showFolder(folder))
+    return () => {
+      stop()
+      off()
+    }
+  }, [showFolder])
 
   // Files passed by the desktop shell ("Open with Stillpage", command line).
   useEffect(() => {
@@ -282,9 +329,15 @@ export default function App() {
     const onKey = (e: KeyboardEvent) => {
       const mod = e.ctrlKey || e.metaKey
       const key = e.key.toLowerCase()
-      if (mod && key === 'o') {
+      if (mod && e.shiftKey && key === 'o') {
+        e.preventDefault()
+        void pickFolder()
+      } else if (mod && key === 'o') {
         e.preventDefault()
         pickFiles()
+      } else if (mod && !e.shiftKey && key === 'p') {
+        e.preventDefault()
+        setQuickOpen(true)
       } else if (e.altKey && key === 'n') {
         e.preventDefault()
         newNote()
@@ -337,7 +390,7 @@ export default function App() {
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [layout, items, newNote, split, toggleZen, toggleSpan, zoomText, zen, settingsOpen, libraryOpen])
+  }, [layout, items, newNote, split, toggleZen, toggleSpan, zoomText, zen, settingsOpen, libraryOpen, pickFolder])
 
   useEffect(() => {
     const el = workspace.current
@@ -476,10 +529,35 @@ export default function App() {
             setLibraryOpen(false)
             pickFiles()
           }}
+          onOpenPath={(file) => {
+            setLibraryOpen(false)
+            void openPath(file)
+          }}
+          onOpenFolder={() => void pickFolder()}
+          onNewFolderNote={async (name) => {
+            setLibraryOpen(false)
+            const file = await newVaultNote(name)
+            if (!file) return toast('The note could not be made in that folder.')
+            const id = await itemForFile(file)
+            if (!id) return
+            // A new note opens ready to write in.
+            localStorage.setItem(`stillpage.mode.${id}`, 'edit')
+            openItems([id])
+          }}
           onNewNote={() => {
             setLibraryOpen(false)
             newNote()
           }}
+        />
+      )}
+
+      {quickOpen && (
+        <QuickOpen
+          items={items}
+          vault={vault}
+          onOpenItem={(id) => openItems([id])}
+          onOpenPath={(file) => void openPath(file)}
+          onClose={() => setQuickOpen(false)}
         />
       )}
 
