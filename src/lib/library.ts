@@ -106,10 +106,14 @@ export function onContentChanged(forget: (id: string) => void) {
 }
 
 /** Replaces a document's text after it was edited here or changed on disk. */
-export async function setDocText(id: string, text: string, mtime?: number) {
+export function setDocText(id: string, text: string, mtime?: number) {
+  return setDocBlob(id, new Blob([text], { type: 'text/plain' }), mtime)
+}
+
+/** Replaces a document's content (a rewritten .docx, say) in the library. */
+export async function setDocBlob(id: string, blob: Blob, mtime?: number) {
   const item = items[id]
   if (!item) return
-  const blob = new Blob([text], { type: 'text/plain' })
   await db.set('blob:' + id, blob)
   forgetRendered(id)
   const name = `${item.title}.${item.ext ?? 'txt'}`

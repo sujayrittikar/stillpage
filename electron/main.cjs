@@ -438,6 +438,55 @@ ipcMain.handle('write-text-file', (_event, file, text, expectedMtime, force) => 
   }
 })
 
+// Word and LibreOffice documents are rewritten from the page editor, which
+// keeps their words and structure but not every detail of their layout. So
+// before Stillpage first changes one, the original is copied to a backups
+// folder, where it can always be found again.
+const DOCUMENT_EXT = /\.(docx|odt)$/i
+const BACKUPS = () => path.join(app.getPath('userData'), 'backups')
+const backedUp = new Set()
+
+function backUp(file) {
+  if (backedUp.has(file)) return null
+  const dir = BACKUPS()
+  fs.mkdirSync(dir, { recursive: true })
+  const ext = path.extname(file)
+  const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')
+  const copy = path.join(dir, `${path.basename(file, ext)} ${stamp}${ext}`)
+  fs.copyFileSync(file, copy)
+  backedUp.add(file)
+  // Keep the newest 50.
+  const all = fs.readdirSync(dir).map((f) => ({ f, t: fs.statSync(path.join(dir, f)).mtimeMs })).sort((a, b) => b.t - a.t)
+  for (const old of all.slice(50)) fs.rmSync(path.join(dir, old.f), { force: true })
+  return copy
+}
+
+ipcMain.handle('write-document', (_event, file, data, expectedMtime, force) => {
+  let stat
+  try {
+    stat = typeof file === 'string' && path.isAbsolute(file) && DOCUMENT_EXT.test(file) ? fs.statSync(file) : null
+  } catch {
+    stat = null
+  }
+  if (!stat?.isFile() || !(data instanceof Uint8Array)) return { error: 'This file is no longer where it was opened from.' }
+  if (!force && typeof expectedMtime === 'number' && Math.abs(stat.mtimeMs - expectedMtime) > 1) return { conflict: true, mtime: stat.mtimeMs }
+  try {
+    const backup = backUp(file)
+    const real = fs.realpathSync(file)
+    const temp = path.join(path.dirname(real), `.${path.basename(real)}.stillpage-${process.pid}`)
+    fs.writeFileSync(temp, Buffer.from(data), { mode: stat.mode })
+    fs.renameSync(temp, real)
+    return { mtime: fs.statSync(file).mtimeMs, backup }
+  } catch (err) {
+    return { error: err?.code === 'EACCES' || err?.code === 'EROFS' ? 'This file is read-only.' : 'The file could not be saved.' }
+  }
+})
+
+ipcMain.handle('show-backups', () => {
+  fs.mkdirSync(BACKUPS(), { recursive: true })
+  return shell.openPath(BACKUPS())
+})
+
 // ---------- Folders (vaults) ----------
 // Open a folder and everything readable in it is there to open, kept up to
 // date as files come and go. Stillpage only reads the folder, except for

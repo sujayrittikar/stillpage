@@ -38,6 +38,8 @@ contextBridge.exposeInMainWorld('stillpage', {
   readTextFile: (file) => ipcRenderer.invoke('read-text-file', file),
   writeTextFile: (file, text, expectedMtime, force) => ipcRenderer.invoke('write-text-file', file, text, expectedMtime, force),
   statFile: (file) => ipcRenderer.invoke('stat-file', file),
+  writeDocument: (file, data, expectedMtime, force) => ipcRenderer.invoke('write-document', file, data, expectedMtime, force),
+  showBackups: () => ipcRenderer.invoke('show-backups'),
   readFiles: (files) => ipcRenderer.invoke('read-files', files),
   pickFolder: () => ipcRenderer.invoke('pick-folder'),
   takePendingFolder: () => ipcRenderer.invoke('take-pending-folder'),

@@ -11,7 +11,11 @@ type MathEdit = MathTarget & { range?: { from: number; to: number } }
 interface Options {
   /** The Markdown to show. A value we didn't produce ourselves is loaded in. */
   text: string | undefined
-  onChange: (markdown: string) => void
+  onChange: (markdown: string, editor: Editor) => void
+  /** The text is HTML (a converted document) rather than Markdown. */
+  html?: boolean
+  /** Keep images (documents have them; notes don't). */
+  images?: boolean
   placeholder: string
   className?: string
   /** Called when outside text arrives that only adds to the end (a quote). */
@@ -22,7 +26,7 @@ interface Options {
  *  `- `, `# `, `**bold**` or `> ` turns into the real thing and the marks
  *  vanish. Returns the editor plus its floating parts (the format bar and the
  *  formula editor) to render next to it. */
-export function useRichEditor({ text, onChange, placeholder, className = '', onAppended }: Options): { editor: Editor | null; overlay: ReactNode } {
+export function useRichEditor({ text, onChange, placeholder, className = '', onAppended, html = false, images = false }: Options): { editor: Editor | null; overlay: ReactNode } {
   // The Markdown we last wrote ourselves. Anything else arriving is an outside
   // change to load in.
   const ours = useRef<string | null>(null)
@@ -35,12 +39,12 @@ export function useRichEditor({ text, onChange, placeholder, className = '', onA
   const [math, setMath] = useState<MathEdit | null>(null)
 
   const editor = useEditor({
-    extensions: richExtensions(placeholder),
+    extensions: richExtensions(placeholder, { images }),
     editorProps: { attributes: { class: `prose note-prose ${className}`, spellcheck: 'true' } },
     onUpdate: ({ editor }) => {
       const md = tidyMarkdown(editor.getMarkdown())
       ours.current = md
-      changed.current(md)
+      changed.current(md, editor)
     },
   })
 
@@ -48,9 +52,9 @@ export function useRichEditor({ text, onChange, placeholder, className = '', onA
     if (!editor || text === undefined || text === ours.current) return
     const grew = ours.current !== null && text.length > ours.current.length
     ours.current = text
-    editor.commands.setContent(text, { contentType: 'markdown', emitUpdate: false })
+    editor.commands.setContent(text, { contentType: html ? 'html' : 'markdown', emitUpdate: false })
     if (grew) appended.current?.()
-  }, [editor, text])
+  }, [editor, text, html])
 
   // Opens the formula editor on the formula at `pos`, or on a new one built
   // from whatever is selected.
