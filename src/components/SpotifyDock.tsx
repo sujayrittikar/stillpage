@@ -21,6 +21,13 @@ interface Playlist {
   uri: string
   image: string | null
 }
+interface Song {
+  id: string
+  uri: string
+  name: string
+  artists: string
+  image: string | null
+}
 interface Device {
   id: string
   name: string
@@ -53,6 +60,8 @@ export function SpotifyDock({ zen }: { zen: boolean }) {
   const [embedDraft, setEmbedDraft] = useState('')
   const [webSignedIn, setWebSignedIn] = useState<boolean | null>(null)
   const [embedKey, setEmbedKey] = useState(0)
+  const [query, setQuery] = useState('')
+  const [found, setFound] = useState<{ q: string; songs: Song[] } | null>(null)
   const [, tick] = useState(0)
   const volumeTimer = useRef<number | undefined>(undefined)
 
@@ -146,6 +155,35 @@ export function SpotifyDock({ zen }: { zen: boolean }) {
     return () => clearInterval(t)
   }, [open, connected, playlists, fail, localId])
 
+  // Search once typing pauses. Results live only in memory, never on disk.
+  const q = query.trim()
+  const songs = found?.q === q ? found.songs : null
+  useEffect(() => {
+    if (!q || !connected) return
+    const ctrl = new AbortController()
+    const t = setTimeout(() => {
+      type Raw = { tracks?: { items: { id: string; uri: string; name: string; artists: { name: string }[]; album?: { images?: { url: string }[] } }[] } }
+      api<Raw>(`/search?type=track&limit=10&q=${encodeURIComponent(q)}`, { signal: ctrl.signal })
+        .then((r) =>
+          setFound({
+            q,
+            songs: (r?.tracks?.items ?? []).filter(Boolean).map((t) => ({
+              id: t.id,
+              uri: t.uri,
+              name: t.name,
+              artists: t.artists.map((a) => a.name).join(', '),
+              image: t.album?.images?.at(-1)?.url ?? null,
+            })),
+          }),
+        )
+        .catch((err) => err.name !== 'AbortError' && fail(err))
+    }, 300)
+    return () => {
+      clearTimeout(t)
+      ctrl.abort()
+    }
+  }, [q, connected, fail])
+
   const target = state.device?.id ?? localId
   const withDevice = (path: string) => (target ? `${path}${path.includes('?') ? '&' : '?'}device_id=${target}` : path)
   const act = async (fn: () => Promise<unknown>) => {
@@ -165,6 +203,7 @@ export function SpotifyDock({ zen }: { zen: boolean }) {
     })
   const skip = (dir: 'next' | 'previous') => act(() => api(withDevice(`/me/player/${dir}`), { method: 'POST' }))
   const playContext = (uri: string) => act(() => api(withDevice('/me/player/play'), { method: 'PUT', body: JSON.stringify({ context_uri: uri }) }))
+  const playSong = (uri: string) => act(() => api(withDevice('/me/player/play'), { method: 'PUT', body: JSON.stringify({ uris: [uri] }) }))
   const transfer = (id: string) => act(() => api('/me/player', { method: 'PUT', body: JSON.stringify({ device_ids: [id], play: true }) }))
   const setVolume = (v: number) => {
     setState((s) => (s.device ? { ...s, device: { ...s.device, volume: v } } : s))
@@ -197,7 +236,7 @@ export function SpotifyDock({ zen }: { zen: boolean }) {
               {state.track?.art ? <img src={state.track.art} alt="" /> : <div className="now-art"><Icon name="music" size={22} /></div>}
               <div className="now-text">
                 <strong>{state.track?.name ?? 'Nothing playing'}</strong>
-                <span>{state.track ? state.track.artists : 'Choose a playlist below.'}</span>
+                <span>{state.track ? state.track.artists : 'Search for a song or pick a playlist.'}</span>
               </div>
             </div>
             <div className="now-progress">
@@ -231,16 +270,47 @@ export function SpotifyDock({ zen }: { zen: boolean }) {
                 </select>
               </label>
             )}
-            <div className="playlists">
-              {playlists === null && <p className="dock-hint">Loading your playlists…</p>}
-              {playlists?.length === 0 && <p className="dock-hint">No playlists on this account yet.</p>}
-              {playlists?.map((p) => (
-                <button key={p.id} className="playlist" onClick={() => playContext(p.uri)}>
-                  {p.image ? <img src={p.image} alt="" /> : <span className="pl-art" />}
-                  <span>{p.name}</span>
-                </button>
-              ))}
-            </div>
+            <input
+              className="dock-search"
+              type="search"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Escape' && query) {
+                  e.stopPropagation()
+                  setQuery('')
+                } else if (e.key === 'Enter' && songs?.[0]) void playSong(songs[0].uri)
+              }}
+              placeholder="Search for a song"
+              aria-label="Search Spotify for a song"
+              spellCheck={false}
+            />
+            {q ? (
+              <div className="playlists">
+                {songs === null && <p className="dock-hint">Searching…</p>}
+                {songs?.length === 0 && <p className="dock-hint">No songs match that.</p>}
+                {songs?.map((s) => (
+                  <button key={s.id} className="playlist" onClick={() => playSong(s.uri)}>
+                    {s.image ? <img src={s.image} alt="" /> : <span className="pl-art" />}
+                    <span className="song">
+                      <span>{s.name}</span>
+                      <small>{s.artists}</small>
+                    </span>
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <div className="playlists">
+                {playlists === null && <p className="dock-hint">Loading your playlists…</p>}
+                {playlists?.length === 0 && <p className="dock-hint">No playlists on this account yet.</p>}
+                {playlists?.map((p) => (
+                  <button key={p.id} className="playlist" onClick={() => playContext(p.uri)}>
+                    {p.image ? <img src={p.image} alt="" /> : <span className="pl-art" />}
+                    <span>{p.name}</span>
+                  </button>
+                ))}
+              </div>
+            )}
             {message && <p className="dock-msg">{message}</p>}
             <button
               className="link-btn"
