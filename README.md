@@ -159,4 +159,4 @@ Contributions are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 [MIT](LICENSE). Stillpage is not affiliated with Spotify.
 
-The built-in English dictionary is [WordNet 3.0](https://wordnet.princeton.edu/), © 2006 Princeton University, used under the WordNet licence, which ships with the app.
+The built-in English dictionary is [WordNet 3.0](https://wordnet.princeton.edu/), © 2006 Princeton University, used under the WordNet licence, which ships with the app. The Japanese dictionary is [JMdict](https://www.edrdg.org/jmdict/j_jmdict.html) (common entries, via [jmdict-simplified](https://github.com/scriptin/jmdict-simplified)), the property of the Electronic Dictionary Research and Development Group, and the autocorrect list comes from [cspell's common English misspellings](https://github.com/streetsidesoftware/cspell-dicts); both are used under CC BY-SA 4.0, and their notices ship with the app.

@@ -1,6 +1,7 @@
-// Holds the English dictionary off the main thread: it's a few megabytes of
-// JSON, parsed once, the first time a word is looked up.
-import type { Entry, Sense } from './dictionary'
+// Holds the dictionaries off the main thread: a few megabytes of JSON each,
+// parsed once, the first time a word in that language is looked up.
+import { deinflect, fits } from './deinflect'
+import type { EnglishEntry, JapaneseEntry, JapaneseWord, Sense } from './dictionary'
 
 interface Data {
   /** [part of speech, definition, examples, synonyms] */
@@ -9,14 +10,25 @@ interface Data {
   irregular: Record<string, string>
 }
 
-let data: Promise<Data> | null = null
+interface JaData {
+  /** [kanji forms, kana forms, senses as [part-of-speech tags, glosses], common] */
+  entries: [string[], string[], [string[], string[]][], number][]
+  index: Record<string, number[]>
+}
 
-function load(url: string): Promise<Data> {
-  data ??= fetch(url).then(async (res) => {
-    if (!res.ok || !res.body) throw new Error('The dictionary is missing from this build.')
-    return (await new Response(res.body.pipeThrough(new DecompressionStream('gzip'))).json()) as Data
-  })
-  return data
+const loaded = new Map<string, Promise<unknown>>()
+
+function load<T>(url: string, missing: string): Promise<T> {
+  let p = loaded.get(url)
+  if (!p) {
+    p = fetch(url).then(async (res) => {
+      if (!res.ok || !res.body) throw new Error(missing)
+      return new Response(res.body.pipeThrough(new DecompressionStream('gzip'))).json()
+    })
+    p.catch(() => loaded.delete(url))
+    loaded.set(url, p)
+  }
+  return p as Promise<T>
 }
 
 // WordNet's "morphy": strip regular endings until a dictionary word appears.
@@ -44,7 +56,7 @@ function baseForms(word: string, d: Data): string[] {
 
 const POS_NAME: Record<string, Sense['pos']> = { n: 'noun', v: 'verb', a: 'adjective', r: 'adverb' }
 
-function lookup(raw: string, d: Data): Entry | null {
+function lookup(raw: string, d: Data): EnglishEntry | null {
   const word = raw
     .trim()
     .replace(/[’']s$/i, '')
@@ -65,17 +77,54 @@ function lookup(raw: string, d: Data): Entry | null {
         senses.push({ pos: POS_NAME[pos] ?? 'noun', definition, examples, synonyms: lemmas.filter((l) => l.toLowerCase() !== form) })
       }
     }
-    return { word: forms[0], asked: word, senses }
+    return { lang: 'en', word: forms[0], asked: word, senses }
   }
   return null
 }
 
-self.onmessage = async (e: MessageEvent<{ id: number; url: string; word: string }>) => {
-  const { id, url, word } = e.data
+// Part-of-speech tags, in words.
+const POS_LABEL: [RegExp, string][] = [
+  [/^n$/, 'noun'], [/^n-(adv|t)$/, 'noun'], [/^pn$/, 'pronoun'], [/^v1/, 'ichidan verb'], [/^v5/, 'godan verb'], [/^vk$/, 'kuru verb'],
+  [/^vs/, 'suru verb'], [/^vt$/, 'transitive'], [/^vi$/, 'intransitive'], [/^adj-i/, 'i-adjective'], [/^adj-na$/, 'na-adjective'],
+  [/^adj-no$/, 'takes の'], [/^adj-pn$/, 'pre-noun'], [/^adv/, 'adverb'], [/^exp$/, 'expression'], [/^int$/, 'interjection'],
+  [/^conj$/, 'conjunction'], [/^prt$/, 'particle'], [/^ctr$/, 'counter'], [/^suf$/, 'suffix'], [/^pref$/, 'prefix'], [/^aux/, 'auxiliary'],
+]
+const posLabels = (tags: string[]) => [...new Set(tags.flatMap((t) => POS_LABEL.find(([re]) => re.test(t))?.[1] ?? []))]
+
+/** The longest word at the start of `text`, with its conjugation undone. */
+function lookupJapanese(text: string, d: JaData): JapaneseEntry | null {
+  const clean = text.trim().slice(0, 16)
+  for (let len = clean.length; len > 0; len--) {
+    const prefix = clean.slice(0, len)
+    const words: (JapaneseWord & { common: number })[] = []
+    const seen = new Set<number>()
+    for (const c of deinflect(prefix)) {
+      for (const at of d.index[c.word] ?? []) {
+        if (seen.has(at)) continue
+        const [kanji, kana, senses, common] = d.entries[at]
+        if (!senses.some(([pos]) => fits(c.type, pos))) continue
+        seen.add(at)
+        words.push({ kanji, kana, senses: senses.map(([pos, glosses]) => ({ pos: posLabels(pos), glosses })), reasons: c.reasons, common })
+      }
+    }
+    if (words.length) {
+      // Exact matches and common words first.
+      words.sort((a, b) => a.reasons.length - b.reasons.length || b.common - a.common)
+      return { lang: 'ja', asked: text, matched: prefix, words: words.slice(0, 6).map((w) => ({ kanji: w.kanji, kana: w.kana, senses: w.senses, reasons: w.reasons })) }
+    }
+  }
+  return null
+}
+
+self.onmessage = async (e: MessageEvent<{ id: number; url: string; word: string; lang: 'en' | 'ja' }>) => {
+  const { id, url, word, lang } = e.data
   try {
-    self.postMessage({ id, entry: lookup(word, await load(url)) })
+    const entry =
+      lang === 'ja'
+        ? lookupJapanese(word, await load<JaData>(url, 'The Japanese dictionary isn’t included in this build.'))
+        : lookup(word, await load<Data>(url, 'The dictionary is missing from this build.'))
+    self.postMessage({ id, entry })
   } catch (err) {
-    data = null
     self.postMessage({ id, error: (err as Error).message })
   }
 }

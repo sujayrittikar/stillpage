@@ -57,6 +57,8 @@ export interface Prefs {
   lineHeight: number
   font: 'serif' | 'sans'
   pdfTint: boolean
+  /** Fix common typos while writing. */
+  autocorrect: boolean
 }
 
 export interface Slide {

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { Layout, Prefs } from './types'
 
-export const DEFAULT_PREFS: Prefs = { theme: 'stone', fontSize: 19, measure: 68, lineHeight: 1.7, font: 'serif', pdfTint: true }
+export const DEFAULT_PREFS: Prefs = { theme: 'stone', fontSize: 19, measure: 68, lineHeight: 1.7, font: 'serif', pdfTint: true, autocorrect: true }
 
 function read<T>(key: string, fallback: T): T {
   try {

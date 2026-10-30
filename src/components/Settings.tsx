@@ -67,6 +67,10 @@ export function Settings({ prefs, set, onClose }: { prefs: Prefs; set: (p: Parti
           <input type="checkbox" checked={prefs.pdfTint} onChange={(e) => set({ pdfTint: e.target.checked })} />
           <span>Tint PDF pages to match the theme</span>
         </label>
+        <label className="check" title="Backspace right after a fix puts your word back">
+          <input type="checkbox" checked={prefs.autocorrect} onChange={(e) => set({ autocorrect: e.target.checked })} />
+          <span>Fix common typos as I write</span>
+        </label>
 
         <details className="shortcuts">
           <summary>Keyboard shortcuts</summary>
