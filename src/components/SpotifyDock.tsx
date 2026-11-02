@@ -74,6 +74,30 @@ interface Device {
 const EMPTY: PlayerState = { playing: false, shuffle: false, track: null, device: null, progress: 0, at: 0 }
 const EMBED_KEY = 'stillpage.spotify.embed'
 
+/** Spotify's own study playlists, offered when nothing is chosen yet. */
+const FOCUS = [
+  { id: '37i9dQZF1DWZeKCadgRdKQ', name: 'Deep focus' },
+  { id: '37i9dQZF1DWWQRwui0ExPn', name: 'Lo-fi' },
+  { id: '37i9dQZF1DX4sWSpwq3LiO', name: 'Piano' },
+  { id: '37i9dQZF1DX9sIqqvKsjG8', name: 'Instrumental' },
+  { id: '37i9dQZF1DWXLeA8Omikj7', name: 'Brain food' },
+  { id: '37i9dQZF1DWWEJlAGA9gs0', name: 'Classical' },
+]
+const focusEmbed = (id: string) => `https://open.spotify.com/embed/playlist/${id}?theme=0`
+
+function FocusPicks({ active, onPick }: { active?: string | null; onPick: (id: string) => void }) {
+  return (
+    <div className="moods" role="group" aria-label="Music for focus">
+      <span className="dock-hint">For focus</span>
+      {FOCUS.map((f) => (
+        <button key={f.id} className={`mood ${active === focusEmbed(f.id) ? 'is-on' : ''}`} onClick={() => onPick(f.id)}>
+          {f.name}
+        </button>
+      ))}
+    </div>
+  )
+}
+
 function toEmbed(link: string): string | null {
   const m = link.trim().match(/(?:open\.spotify\.com\/(?:intl-[a-z]+\/)?|spotify:)(playlist|album|track|artist|show|episode)[/:]([A-Za-z0-9]+)/)
   return m ? `https://open.spotify.com/embed/${m[1]}/${m[2]}?theme=0` : null
@@ -340,6 +364,7 @@ export function SpotifyDock({ zen }: { zen: boolean }) {
               </div>
             ) : (
               <div className="playlists">
+                <FocusPicks onPick={(id) => playContext(`spotify:playlist:${id}`)} />
                 {playlists === null && <p className="dock-hint">Loading your playlists…</p>}
                 {playlists?.length === 0 && <p className="dock-hint">No playlists on this account yet.</p>}
                 {playlists?.map((p) => (
@@ -381,6 +406,15 @@ export function SpotifyDock({ zen }: { zen: boolean }) {
               <input value={embedDraft} onChange={(e) => setEmbedDraft(e.target.value)} placeholder="Paste a Spotify playlist link" spellCheck={false} />
               <button className="btn small">Play</button>
             </form>
+            <FocusPicks
+              active={embed}
+              onPick={(id) => {
+                const url = focusEmbed(id)
+                setMessage(null)
+                setEmbed(url)
+                localStorage.setItem(EMBED_KEY, url)
+              }}
+            />
             {message && <p className="dock-msg">{message}</p>}
             {embed && (
               <>

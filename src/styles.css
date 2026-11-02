@@ -2109,6 +2109,34 @@ kbd {
   color: var(--muted);
 }
 
+.moods {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.playlists .moods {
+  padding: 2px 6px 8px;
+}
+
+.mood {
+  padding: 3px 10px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  font-size: 12.5px;
+  color: var(--ink-2);
+}
+
+.mood:hover {
+  background: var(--surface-2);
+}
+
+.mood.is-on {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
 .dock-row {
   display: flex;
   align-items: center;
