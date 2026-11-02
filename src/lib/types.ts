@@ -139,7 +139,7 @@ declare global {
       exportPdf: (name: string, html: string) => Promise<string | null>
       saveFile: (name: string, text: string) => Promise<string | null>
       showInFolder: (file: string) => Promise<void>
-      officeStatus: () => Promise<{ ready: boolean; install: string }>
+      officeStatus: () => Promise<{ ready: boolean; install: string; sandboxed?: boolean }>
       convertToPdf: (name: string, data: Uint8Array) => Promise<{ pdf?: Uint8Array; error?: string }>
       openExternal: (url: string) => Promise<void>
       pathForFile: (file: File) => string

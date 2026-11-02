@@ -622,11 +622,14 @@ ipcMain.handle('vault-reveal', (_event, file) => {
 // Old Word/PowerPoint files, drawings, Pages, Keynote and friends have no
 // browser-side reader; LibreOffice can draw any of them as PDF pages. We use
 // whatever LibreOffice the person already has (distro package, snap, flatpak
-// or the official /opt build) and never bundle it.
+// or the official /opt build) and never bundle it. A Flatpak sandbox can't
+// run programs from the host, so there we don't look at all.
+const FLATPAK = Boolean(process.env.FLATPAK_ID)
 
 let officeBinary
 function findOffice() {
   if (officeBinary !== undefined) return officeBinary
+  if (FLATPAK) return (officeBinary = null)
   const candidates = [
     process.env.STILLPAGE_SOFFICE,
     ...(process.env.PATH ?? '').split(':').flatMap((dir) => [path.join(dir, 'soffice'), path.join(dir, 'libreoffice')]),
@@ -699,7 +702,7 @@ function officeInstallCommand() {
 
 ipcMain.handle('office-status', () => {
   officeBinary = undefined // look again: it may have just been installed
-  return { ready: Boolean(findOffice()), install: officeInstallCommand() }
+  return { ready: Boolean(findOffice()), install: FLATPAK ? '' : officeInstallCommand(), sandboxed: FLATPAK }
 })
 ipcMain.handle('convert-to-pdf', async (_event, name, data) => {
   if (!(data instanceof Uint8Array) || data.byteLength > MAX_FILE_BYTES) return { error: 'This file is too large to convert.' }

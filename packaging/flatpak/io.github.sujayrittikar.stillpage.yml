@@ -1,0 +1,53 @@
+id: io.github.sujayrittikar.stillpage
+runtime: org.freedesktop.Platform
+runtime-version: '26.08'
+sdk: org.freedesktop.Sdk
+base: org.electronjs.Electron2.BaseApp
+base-version: '26.08'
+command: stillpage
+separate-locales: false
+
+finish-args:
+  - --share=ipc
+  - --share=network
+  # X11 rather than Wayland: spanning one window across monitors needs an X11
+  # window-manager hint. On Wayland sessions this runs under XWayland.
+  - --socket=x11
+  - --socket=pulseaudio
+  - --device=dri
+  # Folders of notes are read, watched and written in place, and files can be
+  # opened by path from the command line.
+  - --filesystem=home
+
+modules:
+  - name: stillpage
+    buildsystem: simple
+    build-commands:
+      - bsdtar -xf stillpage.deb data.tar.xz
+      - tar -xf data.tar.xz
+      - cp -a opt/Stillpage /app/stillpage
+      # zypak provides the sandbox inside Flatpak.
+      - rm /app/stillpage/chrome-sandbox
+      - install -Dm755 stillpage.sh /app/bin/stillpage
+      - install -Dm644 usr/share/icons/hicolor/512x512/apps/stillpage.png /app/share/icons/hicolor/512x512/apps/${FLATPAK_ID}.png
+      - install -Dm644 ${FLATPAK_ID}.desktop -t /app/share/applications
+      - install -Dm644 ${FLATPAK_ID}.metainfo.xml -t /app/share/metainfo
+    sources:
+      - type: file
+        dest-filename: stillpage.deb
+        url: https://github.com/sujayrittikar/stillpage/releases/download/v0.2.3/Stillpage-0.2.3-amd64.deb
+        sha256: e240aa33fa970edf3072933c770d58cc7ed69b2d71b8eeee17403c29ee0bbe41
+        only-arches: [x86_64]
+        x-checker-data:
+          type: json
+          url: https://api.github.com/repos/sujayrittikar/stillpage/releases/latest
+          version-query: .tag_name | sub("^v"; "")
+          url-query: .assets[] | select(.name == "Stillpage-" + $version + "-amd64.deb") | .browser_download_url
+      - type: script
+        dest-filename: stillpage.sh
+        commands:
+          - exec zypak-wrapper /app/stillpage/stillpage --ozone-platform=x11 "$@"
+      - type: file
+        path: io.github.sujayrittikar.stillpage.desktop
+      - type: file
+        path: io.github.sujayrittikar.stillpage.metainfo.xml
