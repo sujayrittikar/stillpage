@@ -2070,6 +2070,10 @@ kbd {
   white-space: nowrap;
 }
 
+.controls .is-on {
+  color: var(--accent);
+}
+
 .dock-search {
   height: 32px;
   padding: 0 10px;

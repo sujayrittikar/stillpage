@@ -10,6 +10,7 @@ interface Track {
 }
 interface PlayerState {
   playing: boolean
+  shuffle: boolean
   track: Track | null
   device: { id: string; name: string; volume: number } | null
   progress: number
@@ -25,8 +26,44 @@ interface Song {
   id: string
   uri: string
   name: string
+  /** The first artist, used to find more of their songs. */
+  artist: string
   artists: string
   image: string | null
+}
+type RawSearch = { tracks?: { items: ({ id: string; uri: string; name: string; artists: { name: string }[]; album?: { images?: { url: string }[] } } | null)[] } }
+
+function toSongs(r: RawSearch | null): Song[] {
+  return (r?.tracks?.items ?? []).filter((t) => t !== null).map((t) => ({
+    id: t.id,
+    uri: t.uri,
+    name: t.name,
+    artist: t.artists[0]?.name ?? '',
+    artists: t.artists.map((a) => a.name).join(', '),
+    image: t.album?.images?.at(-1)?.url ?? null,
+  }))
+}
+
+function shuffled<T>(list: T[]): T[] {
+  const out = [...list]
+  for (let i = out.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1))
+    ;[out[i], out[j]] = [out[j], out[i]]
+  }
+  return out
+}
+
+/** What plays after a searched song: more by the same artist and the other
+ *  results, shuffled, with no song twice. Built from search alone, since
+ *  Spotify doesn't offer recommendations to personal apps. */
+async function mixAfter(song: Song, others: Song[]): Promise<string[]> {
+  const q = encodeURIComponent(`artist:"${song.artist.replace(/"/g, '')}"`)
+  const pages = await Promise.all([0, 10, 20].map((offset) => api<RawSearch>(`/search?type=track&limit=10&offset=${offset}&q=${q}`).catch(() => null)))
+  const seen = new Set([song.name.toLowerCase()])
+  const fresh = (s: Song) => !seen.has(s.name.toLowerCase()) && seen.add(s.name.toLowerCase())
+  return shuffled([...pages.flatMap(toSongs), ...others].filter(fresh))
+    .slice(0, 40)
+    .map((s) => s.uri)
 }
 interface Device {
   id: string
@@ -34,7 +71,7 @@ interface Device {
   is_active: boolean
 }
 
-const EMPTY: PlayerState = { playing: false, track: null, device: null, progress: 0, at: 0 }
+const EMPTY: PlayerState = { playing: false, shuffle: false, track: null, device: null, progress: 0, at: 0 }
 const EMBED_KEY = 'stillpage.spotify.embed'
 
 function toEmbed(link: string): string | null {
@@ -93,11 +130,12 @@ export function SpotifyDock({ zen }: { zen: boolean }) {
 
   const refresh = useCallback(async () => {
     try {
-      type Raw = { is_playing: boolean; progress_ms: number; item?: { name: string; duration_ms: number; artists?: { name: string }[]; album?: { images?: { url: string }[] }; show?: { name: string; images?: { url: string }[] } }; device?: { id: string; name: string; volume_percent: number } }
+      type Raw = { is_playing: boolean; shuffle_state?: boolean; progress_ms: number; item?: { name: string; duration_ms: number; artists?: { name: string }[]; album?: { images?: { url: string }[] }; show?: { name: string; images?: { url: string }[] } }; device?: { id: string; name: string; volume_percent: number } }
       const s = await api<Raw>('/me/player')
       if (!s) return setState(EMPTY)
       setState({
         playing: s.is_playing,
+        shuffle: !!s.shuffle_state,
         progress: s.progress_ms ?? 0,
         at: Date.now(),
         device: s.device ? { id: s.device.id, name: s.device.name, volume: s.device.volume_percent } : null,
@@ -162,20 +200,8 @@ export function SpotifyDock({ zen }: { zen: boolean }) {
     if (!q || !connected) return
     const ctrl = new AbortController()
     const t = setTimeout(() => {
-      type Raw = { tracks?: { items: { id: string; uri: string; name: string; artists: { name: string }[]; album?: { images?: { url: string }[] } }[] } }
-      api<Raw>(`/search?type=track&limit=10&q=${encodeURIComponent(q)}`, { signal: ctrl.signal })
-        .then((r) =>
-          setFound({
-            q,
-            songs: (r?.tracks?.items ?? []).filter(Boolean).map((t) => ({
-              id: t.id,
-              uri: t.uri,
-              name: t.name,
-              artists: t.artists.map((a) => a.name).join(', '),
-              image: t.album?.images?.at(-1)?.url ?? null,
-            })),
-          }),
-        )
+      api<RawSearch>(`/search?type=track&limit=10&q=${encodeURIComponent(q)}`, { signal: ctrl.signal })
+        .then((r) => setFound({ q, songs: toSongs(r) }))
         .catch((err) => err.name !== 'AbortError' && fail(err))
     }, 300)
     return () => {
@@ -203,7 +229,17 @@ export function SpotifyDock({ zen }: { zen: boolean }) {
     })
   const skip = (dir: 'next' | 'previous') => act(() => api(withDevice(`/me/player/${dir}`), { method: 'POST' }))
   const playContext = (uri: string) => act(() => api(withDevice('/me/player/play'), { method: 'PUT', body: JSON.stringify({ context_uri: uri }) }))
-  const playSong = (uri: string) => act(() => api(withDevice('/me/player/play'), { method: 'PUT', body: JSON.stringify({ uris: [uri] }) }))
+  const playSong = (song: Song) =>
+    act(async () => {
+      const next = await mixAfter(song, songs?.filter((s) => s.id !== song.id) ?? [])
+      await api(withDevice('/me/player/play'), { method: 'PUT', body: JSON.stringify({ uris: [song.uri, ...next] }) })
+    })
+  const toggleShuffle = () =>
+    act(async () => {
+      const on = !state.shuffle
+      setState((s) => ({ ...s, shuffle: on }))
+      await api(withDevice(`/me/player/shuffle?state=${on}`), { method: 'PUT' })
+    })
   const transfer = (id: string) => act(() => api('/me/player', { method: 'PUT', body: JSON.stringify({ device_ids: [id], play: true }) }))
   const setVolume = (v: number) => {
     setState((s) => (s.device ? { ...s, device: { ...s.device, volume: v } } : s))
@@ -252,6 +288,9 @@ export function SpotifyDock({ zen }: { zen: boolean }) {
               <button className="icon-btn" onClick={() => skip('next')} aria-label="Next">
                 <Icon name="next" size={18} />
               </button>
+              <button className={`icon-btn ${state.shuffle ? 'is-on' : ''}`} onClick={toggleShuffle} aria-label="Shuffle" aria-pressed={state.shuffle} title={state.shuffle ? 'Shuffle is on' : 'Shuffle'}>
+                <Icon name="shuffle" size={17} />
+              </button>
               <label className="volume" title="Volume">
                 <Icon name="volume" size={16} />
                 <input type="range" min={0} max={100} value={state.device?.volume ?? 60} onChange={(e) => setVolume(Number(e.target.value))} aria-label="Volume" />
@@ -279,7 +318,7 @@ export function SpotifyDock({ zen }: { zen: boolean }) {
                 if (e.key === 'Escape' && query) {
                   e.stopPropagation()
                   setQuery('')
-                } else if (e.key === 'Enter' && songs?.[0]) void playSong(songs[0].uri)
+                } else if (e.key === 'Enter' && songs?.[0]) void playSong(songs[0])
               }}
               placeholder="Search for a song"
               aria-label="Search Spotify for a song"
@@ -290,7 +329,7 @@ export function SpotifyDock({ zen }: { zen: boolean }) {
                 {songs === null && <p className="dock-hint">Searching…</p>}
                 {songs?.length === 0 && <p className="dock-hint">No songs match that.</p>}
                 {songs?.map((s) => (
-                  <button key={s.id} className="playlist" onClick={() => playSong(s.uri)}>
+                  <button key={s.id} className="playlist" onClick={() => playSong(s)}>
                     {s.image ? <img src={s.image} alt="" /> : <span className="pl-art" />}
                     <span className="song">
                       <span>{s.name}</span>
