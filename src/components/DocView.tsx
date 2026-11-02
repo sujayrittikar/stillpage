@@ -57,9 +57,13 @@ function readView(id: string): View {
 /** Shown when a file needs LibreOffice and it isn't installed. */
 function OfficeMissing({ item, onRetry, onReading }: { item: Item; onRetry: () => void; onReading?: () => void }) {
   const [install, setInstall] = useState<string | null>(null)
+  const [sandboxed, setSandboxed] = useState(false)
   const [copied, setCopied] = useState(false)
   useEffect(() => {
-    void window.stillpage?.officeStatus().then((s) => setInstall(s.install))
+    void window.stillpage?.officeStatus().then((s) => {
+      setInstall(s.install)
+      setSandboxed(!!s.sandboxed)
+    })
   }, [])
   const kind = kindName(item.ext ?? '')
   return (
@@ -69,8 +73,11 @@ function OfficeMissing({ item, onRetry, onReading }: { item: Item; onRetry: () =
       <p>
         {onReading
           ? 'Stillpage asks LibreOffice, the free office suite, to draw the pages exactly as the author laid them out.'
-          : `Stillpage opens ${kind}s through LibreOffice, the free office suite. Install it once and every file like this opens here, page for page.`}
+          : sandboxed
+            ? `Stillpage opens ${kind}s through LibreOffice, the free office suite.`
+            : `Stillpage opens ${kind}s through LibreOffice, the free office suite. Install it once and every file like this opens here, page for page.`}
       </p>
+      {sandboxed && <p>The Flatpak version can't reach LibreOffice, because Flatpak apps can't run programs installed on your computer. The .deb, AppImage and Arch packages can.</p>}
       {install && (
         <div className="command">
           <code>{install}</code>
@@ -85,9 +92,11 @@ function OfficeMissing({ item, onRetry, onReading }: { item: Item; onRetry: () =
         </div>
       )}
       <div className="office-actions">
-        <button className="btn small" onClick={onRetry}>
-          I've installed it
-        </button>
+        {!sandboxed && (
+          <button className="btn small" onClick={onRetry}>
+            I've installed it
+          </button>
+        )}
         {onReading && (
           <button className="btn small quiet" onClick={onReading}>
             Back to reading view

@@ -1,0 +1,115 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>io.github.sujayrittikar.stillpage</id>
+  <name>Stillpage</name>
+  <summary>Read and take notes in one calm window</summary>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>MIT</project_license>
+  <developer id="io.github.sujayrittikar">
+    <name>Sujay Rittikar</name>
+  </developer>
+
+  <description>
+    <p>
+      Stillpage is a quiet reader and notebook. Open a PDF, a Word file, a deck or a folder of notes, write beside it, and keep your music playing, all in one window.
+    </p>
+    <ul>
+      <li>Reads PDF, Word, PowerPoint, Excel, OpenDocument, EPUB, Markdown, Jupyter notebooks, RTF, HTML, CSV, plain text, images and source code</li>
+      <li>Split the window into up to four panes, each with its own tabs, and stretch it across two monitors</li>
+      <li>Write notes beside what you read, with headings, checklists, tables and formulas, and quote a passage straight into a note</li>
+      <li>Open any folder of notes as it is: new notes are plain Markdown files you can sync however you like</li>
+      <li>Look up words offline in English and Japanese dictionaries</li>
+      <li>Play Spotify playlists without leaving the page, with focus playlists one click away</li>
+      <li>Zen mode, four gentle themes, and a focus timer</li>
+    </ul>
+    <p>
+      Everything stays on your computer. There are no accounts and no telemetry. The only network calls go to Spotify, and only when you use the music panel.
+    </p>
+  </description>
+
+  <launchable type="desktop-id">io.github.sujayrittikar.stillpage.desktop</launchable>
+  <provides>
+    <binary>stillpage</binary>
+  </provides>
+
+  <url type="homepage">https://github.com/sujayrittikar/stillpage</url>
+  <url type="bugtracker">https://github.com/sujayrittikar/stillpage/issues</url>
+  <url type="vcs-browser">https://github.com/sujayrittikar/stillpage</url>
+  <url type="contribute">https://github.com/sujayrittikar/stillpage/blob/main/CONTRIBUTING.md</url>
+
+  <screenshots>
+    <screenshot type="default">
+      <caption>A PDF and a note side by side</caption>
+      <image>https://raw.githubusercontent.com/sujayrittikar/stillpage/v0.2.3/docs/split.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>Zen mode leaves only the text</caption>
+      <image>https://raw.githubusercontent.com/sujayrittikar/stillpage/v0.2.3/docs/zen.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>A PowerPoint deck as readable slides</caption>
+      <image>https://raw.githubusercontent.com/sujayrittikar/stillpage/v0.2.3/docs/slides.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>The Dusk theme with a tinted PDF</caption>
+      <image>https://raw.githubusercontent.com/sujayrittikar/stillpage/v0.2.3/docs/dusk.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>Reading settings</caption>
+      <image>https://raw.githubusercontent.com/sujayrittikar/stillpage/v0.2.3/docs/settings.png</image>
+    </screenshot>
+  </screenshots>
+
+  <branding>
+    <color type="primary" scheme_preference="light">#e8ebe5</color>
+    <color type="primary" scheme_preference="dark">#3a5676</color>
+  </branding>
+
+  <content_rating type="oars-1.1"/>
+
+  <requires>
+    <display_length compare="ge">768</display_length>
+  </requires>
+  <supports>
+    <control>keyboard</control>
+    <control>pointing</control>
+  </supports>
+
+  <keywords>
+    <keyword>pdf</keyword>
+    <keyword>reader</keyword>
+    <keyword>notes</keyword>
+    <keyword>markdown</keyword>
+    <keyword>epub</keyword>
+    <keyword>focus</keyword>
+    <keyword>study</keyword>
+  </keywords>
+
+  <releases>
+    <release version="0.2.3" date="2026-11-02">
+      <description>
+        <ul>
+          <li>The music panel suggests six focus playlists</li>
+          <li>A shuffle button, and more music queued after a song you searched for</li>
+          <li>Fewer false errors from Spotify player commands</li>
+        </ul>
+      </description>
+    </release>
+    <release version="0.2.2" date="2026-10-30">
+      <description>
+        <ul>
+          <li>Search Spotify for a song from the music panel</li>
+          <li>The app's cache now stays under 64 MB</li>
+        </ul>
+      </description>
+    </release>
+    <release version="0.2.1" date="2026-10-30">
+      <description>
+        <ul>
+          <li>Edit Word and OpenDocument text files and save them in their own format</li>
+          <li>Move a note into your open folder as a Markdown file</li>
+        </ul>
+      </description>
+    </release>
+  </releases>
+</component>

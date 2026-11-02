@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Stillpage
+Comment=Read and take notes in one calm window
+Exec=stillpage %U
+Icon=io.github.sujayrittikar.stillpage
+Terminal=false
+StartupWMClass=Stillpage
+Categories=Office;Viewer;
+Keywords=pdf;reader;notes;markdown;epub;focus;
+MimeType=application/pdf;text/markdown;application/vnd.openxmlformats-officedocument.wordprocessingml.document;application/vnd.openxmlformats-officedocument.presentationml.presentation;application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;application/epub+zip;application/vnd.oasis.opendocument.text;application/x-ipynb+json;application/vnd.oasis.opendocument.presentation;application/vnd.oasis.opendocument.spreadsheet;application/rtf;
