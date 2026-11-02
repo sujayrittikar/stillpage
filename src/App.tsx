@@ -11,9 +11,10 @@ import { QuickOpen } from './components/QuickOpen'
 import { itemForFile, newVaultNote, openVault, startVault, useVault } from './lib/vault'
 import { uid } from './lib/db'
 import { ACCEPT } from './lib/formats'
-import { appendToNote, createNote, discardDrafts, getItem, importFiles, removeItem, renameItem, touchItem, useItems } from './lib/library'
+import { addVideo, appendToNote, createNote, discardDrafts, getItem, importFiles, removeItem, renameItem, touchItem, useItems } from './lib/library'
 import { DEFAULT_PREFS, loadLayout, saveLayout, usePrefs } from './lib/prefs'
 import type { DesktopFile, Layout, Pane } from './lib/types'
+import { clock, currentPlayer, parseYouTube, playerFor, timestampUrl, type VideoRef } from './lib/youtube'
 
 const MAX_PANES = 4
 const MIN_TEXT = 13
@@ -153,7 +154,7 @@ export default function App() {
       }
       const fi = Math.max(0, l.panes.findIndex((p) => p.id === l.focused))
       const focused = l.panes[fi]
-      const readingDoc = focused.active && getItem(focused.active)?.kind === 'doc'
+      const readingDoc = focused.active && getItem(focused.active)?.kind !== 'note'
       if (!readingDoc) return addTabs(l, focused.id, [id])
       if (l.panes.length === 1) {
         const pane: Pane = { id: uid(), tabs: [id], active: id, size: 0.42 }
@@ -268,6 +269,101 @@ export default function App() {
 
   const newNote = useCallback(() => openBeside(createNote()), [openBeside])
 
+  /** Opens a YouTube video. Into the given pane; otherwise where you are
+   *  reading, as one more tab, or beside the note you are writing in, which
+   *  keeps the keyboard. A time in the link seeks there. */
+  const openVideo = useCallback(
+    (ref: VideoRef, paneId?: string) => {
+      const id = addVideo(ref)
+      const player = playerFor(id)
+      if (player && ref.start !== undefined) {
+        player.command('seekTo', [ref.start, true])
+        player.command('playVideo')
+      }
+      if (paneId) return openItems([id], paneId)
+      touchItem(id)
+      setLayout((l) => {
+        const holder = l.panes.find((p) => p.tabs.includes(id))
+        if (holder) return { ...l, panes: l.panes.map((p) => (p === holder ? { ...p, active: id } : p)) }
+        const fi = Math.max(0, l.panes.findIndex((p) => p.id === l.focused))
+        const focused = l.panes[fi]
+        const writing = focused.active && getItem(focused.active)?.kind === 'note'
+        if (!writing) return addTabs(l, focused.id, [id])
+        if (l.panes.length === 1) {
+          const pane: Pane = { id: uid(), tabs: [id], active: id, size: 0.58 }
+          return { focused: focused.id, panes: normalise([pane, { ...focused, size: 0.42 }]) }
+        }
+        const neighbour = l.panes[fi - 1] ?? l.panes[fi + 1]
+        return { ...addTabs(l, neighbour.id, [id]), focused: focused.id }
+      })
+    },
+    [openItems],
+  )
+
+  /** Puts the video's current time into a note, as a link back to it: at the
+   *  cursor of the note you are writing, or at the end of the last one. */
+  const stamp = useCallback(async () => {
+    const player = currentPlayer()
+    if (!player) return toast('Open a YouTube video first: paste its link anywhere.')
+    const at = player.time()
+    const label = clock(at)
+    const href = timestampUrl(player.videoId, at)
+    const focused = layout.panes.find((p) => p.id === layout.focused)
+    let target = focused?.active && getItem(focused.active)?.kind === 'note' ? focused.active : lastNote.current && getItem(lastNote.current) ? lastNote.current : null
+    if (!target) target = createNote(`# Notes on ${getItem(player.itemId)?.title ?? 'a video'}\n\n`)
+    lastNote.current = target
+    if (layout.panes.some((p) => p.active === target)) {
+      window.dispatchEvent(new CustomEvent('stillpage:insert-link', { detail: { note: target, label, href } }))
+    } else {
+      await appendToNote(target, `[${label}](${href}) `)
+      openBeside(target)
+    }
+  }, [layout, openBeside, toast])
+
+  useEffect(() => {
+    const onStamp = () => void stamp()
+    window.addEventListener('stillpage:timestamp', onStamp)
+    return () => window.removeEventListener('stillpage:timestamp', onStamp)
+  }, [stamp])
+
+  // A YouTube link pasted anywhere but into text opens the video.
+  useEffect(() => {
+    const onPaste = (e: ClipboardEvent) => {
+      const el = e.target as HTMLElement | null
+      if (el?.closest?.('input, textarea, [contenteditable="true"]')) return
+      const ref = parseYouTube(e.clipboardData?.getData('text/plain') ?? '')
+      if (!ref) return
+      e.preventDefault()
+      openVideo(ref)
+    }
+    document.addEventListener('paste', onPaste)
+    return () => document.removeEventListener('paste', onPaste)
+  }, [openVideo])
+
+  // A timestamp in a note plays the video from there. The editor never sees
+  // the click, so the cursor stays where you were writing.
+  useEffect(() => {
+    const timestamp = (e: MouseEvent) => {
+      const link = (e.target as Element | null)?.closest?.('.note a[href]')
+      const ref = link && e.button === 0 && parseYouTube(link.getAttribute('href') ?? '')
+      if (!ref) return null
+      e.preventDefault()
+      e.stopPropagation()
+      return ref
+    }
+    const onDown = (e: MouseEvent) => void timestamp(e)
+    const onClick = (e: MouseEvent) => {
+      const ref = timestamp(e)
+      if (ref) openVideo(ref)
+    }
+    document.addEventListener('mousedown', onDown, true)
+    document.addEventListener('click', onClick, true)
+    return () => {
+      document.removeEventListener('mousedown', onDown, true)
+      document.removeEventListener('click', onClick, true)
+    }
+  }, [openVideo])
+
   const split = useCallback(() => {
     setLayout((l) => {
       if (l.panes.length >= MAX_PANES) return l
@@ -379,6 +475,14 @@ export default function App() {
         e.preventDefault()
         if (document.fullscreenElement) void document.exitFullscreen()
         else void document.documentElement.requestFullscreen()
+      } else if (e.altKey && key === 't') {
+        e.preventDefault()
+        void stamp()
+      } else if (e.altKey && (key === 'k' || key === 'j' || key === 'l') && currentPlayer()) {
+        e.preventDefault()
+        const player = currentPlayer()!
+        if (key === 'k') player.command(player.playing() ? 'pauseVideo' : 'playVideo')
+        else player.command('seekTo', [Math.max(0, player.time() + (key === 'l' ? 10 : -10)), true])
       } else if (e.altKey && key === 'w') {
         e.preventDefault()
         const pane = layout.panes.find((p) => p.id === layout.focused)
@@ -408,7 +512,7 @@ export default function App() {
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [layout, items, newNote, split, toggleZen, toggleSpan, zoomText, zen, settingsOpen, libraryOpen, pickFolder])
+  }, [layout, items, newNote, split, toggleZen, toggleSpan, zoomText, zen, settingsOpen, libraryOpen, pickFolder, stamp])
 
   useEffect(() => {
     const el = workspace.current
@@ -525,6 +629,7 @@ export default function App() {
                 const id = createNote()
                 openItems([id], pane.id)
               }}
+              onOpenVideo={(ref) => openVideo(ref, pane.id)}
             />
             {i < layout.panes.length - 1 && <Divider onDrag={(dx) => resize(i, dx)} />}
           </div>
@@ -575,6 +680,7 @@ export default function App() {
           vault={vault}
           onOpenItem={(id) => openItems([id])}
           onOpenPath={(file) => void openPath(file)}
+          onOpenVideo={(ref) => openVideo(ref)}
           onClose={() => setQuickOpen(false)}
         />
       )}

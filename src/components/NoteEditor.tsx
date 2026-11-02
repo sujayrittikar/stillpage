@@ -32,6 +32,29 @@ export function NoteEditor({ id, active }: { id: string; active: boolean }) {
   // Opening an empty note puts the cursor in it. Only on opening: an empty
   // check on every keystroke would yank the cursor out of a fresh heading.
   const loaded = text !== undefined
+
+  // A timestamp from a video lands where you are writing.
+  useEffect(() => {
+    if (!editor) return
+    const onInsert = (e: Event) => {
+      const { note, label, href } = (e as CustomEvent<{ note: string; label: string; href: string }>).detail
+      if (note !== id) return
+      const { $from } = editor.state.selection
+      const before = $from.parent.textBetween(Math.max(0, $from.parentOffset - 1), $from.parentOffset)
+      editor
+        .chain()
+        .focus()
+        .insertContent([
+          ...(before && !/\s/.test(before) ? [{ type: 'text', text: ' ' }] : []),
+          { type: 'text', text: label, marks: [{ type: 'link', attrs: { href } }] },
+          { type: 'text', text: ' ' },
+        ])
+        .unsetMark('link')
+        .run()
+    }
+    window.addEventListener('stillpage:insert-link', onInsert)
+    return () => window.removeEventListener('stillpage:insert-link', onInsert)
+  }, [editor, id])
   useEffect(() => {
     if (active && editor && loaded && editor.isEmpty) editor.commands.focus('end')
   }, [active, editor, loaded])

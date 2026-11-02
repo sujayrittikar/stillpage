@@ -10,6 +10,7 @@ const { pathToFileURL } = require('node:url')
 const DEV_URL = process.env.STILLPAGE_DEV_URL
 const DIST = path.join(__dirname, '..', 'dist')
 const SPOTIFY_REDIRECT = 'http://127.0.0.1:43117/callback'
+const YOUTUBE_REFERRER = 'io.github.sujayrittikar.stillpage'
 const MAX_FILE_BYTES = 512 * 1024 * 1024
 const CSP = [
   "default-src 'self'",
@@ -17,8 +18,8 @@ const CSP = [
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: blob: https:",
   "font-src 'self' data:",
-  "connect-src 'self' data: blob: https://api.spotify.com https://accounts.spotify.com",
-  "frame-src https://sdk.scdn.co https://open.spotify.com",
+  "connect-src 'self' data: blob: https://api.spotify.com https://accounts.spotify.com https://www.youtube.com",
+  "frame-src https://sdk.scdn.co https://open.spotify.com https://www.youtube-nocookie.com",
   "worker-src 'self' blob:",
   "media-src 'self' blob: https:",
   "object-src 'none'",
@@ -791,6 +792,14 @@ app.whenReady().then(async () => {
     if (spanned && screen.getAllDisplays().length < 2) {
       void setSpanned(false).then(() => win?.webContents.send('span-changed', false))
     }
+  })
+
+  // YouTube refuses to play an embed (error 153) unless the request names
+  // the site it is embedded in, and app:// sends no Referer. Name the app the
+  // way YouTube asks native apps to.
+  session.defaultSession.webRequest.onBeforeSendHeaders({ urls: ['https://www.youtube-nocookie.com/embed/*'] }, (details, callback) => {
+    details.requestHeaders.Referer ||= `https://${YOUTUBE_REFERRER}/`
+    callback({ requestHeaders: details.requestHeaders })
   })
 
   pendingPaths.push(...filesFromArgv(process.argv))

@@ -2,9 +2,11 @@ import { useRef, useState, type DragEvent } from 'react'
 import { usePaneFit } from '../lib/fit'
 import { FORMAT_LABEL } from '../lib/formats'
 import type { Item, Pane, Prefs } from '../lib/types'
+import { parseYouTube, type VideoRef } from '../lib/youtube'
 import { DocView } from './DocView'
 import { Enso, Icon } from './Icon'
 import { NoteEditor } from './NoteEditor'
+import { VideoView } from './VideoView'
 
 export const TAB_MIME = 'application/x-stillpage-tab'
 
@@ -23,11 +25,14 @@ interface Props {
   onDropFiles: (files: File[]) => void
   onOpen: () => void
   onNewNote: () => void
+  onOpenVideo: (ref: VideoRef) => void
 }
 
 export function PaneView(p: Props) {
   const [dropping, setDropping] = useState(false)
   const [renaming, setRenaming] = useState<string | null>(null)
+  const [askingVideo, setAskingVideo] = useState(false)
+  const [videoError, setVideoError] = useState(false)
 
   const accepts = (e: DragEvent) => e.dataTransfer.types.includes(TAB_MIME) || e.dataTransfer.types.includes('Files')
   const onDragOver = (e: DragEvent) => {
@@ -83,6 +88,7 @@ export function PaneView(p: Props) {
                 onAuxClick={(e) => e.button === 1 && p.onCloseTab(id)}
               >
                 {item.kind === 'note' && <Icon name="note" size={13} />}
+                {item.kind === 'video' && <Icon name="play" size={12} />}
                 {renaming === id ? (
                   <input
                     className="tab-rename"
@@ -141,13 +147,47 @@ export function PaneView(p: Props) {
               <button className="btn quiet" onClick={p.onNewNote}>
                 <Icon name="note" size={16} /> New note
               </button>
+              <button className="btn quiet" onClick={() => setAskingVideo((a) => !a)} aria-expanded={askingVideo}>
+                <Icon name="play" size={14} /> YouTube video
+              </button>
             </div>
-            <p className="empty-formats">PDF, Word, PowerPoint, Excel, CSV, EPUB, Markdown, Jupyter, OpenDocument, RTF, HTML, images and source code.</p>
+            {askingVideo && (
+              <form
+                className="inline-form video-ask"
+                onSubmit={(e) => {
+                  e.preventDefault()
+                  const ref = parseYouTube(String(new FormData(e.currentTarget).get('link') ?? ''))
+                  if (!ref) return setVideoError(true)
+                  setAskingVideo(false)
+                  setVideoError(false)
+                  p.onOpenVideo(ref)
+                }}
+              >
+                <input
+                  name="link"
+                  autoFocus
+                  placeholder="Paste a YouTube link"
+                  aria-label="YouTube link"
+                  spellCheck={false}
+                  onChange={() => setVideoError(false)}
+                  onKeyDown={(e) => e.key === 'Escape' && (e.stopPropagation(), setAskingVideo(false))}
+                />
+                <button className="btn small">Watch</button>
+              </form>
+            )}
+            {videoError && <p className="empty-formats video-error">That doesn't look like a YouTube video link.</p>}
+            <p className="empty-formats">PDF, Word, PowerPoint, Excel, CSV, EPUB, Markdown, Jupyter, OpenDocument, RTF, HTML, images, source code and YouTube videos.</p>
           </div>
         )}
         {tabs.map((id) => (
           <div key={id} className={`tab-panel ${id === p.pane.active ? '' : 'inactive'}`} inert={id !== p.pane.active}>
-            {p.items[id].kind === 'note' ? <NoteEditor id={id} active={id === p.pane.active} /> : <DocView item={p.items[id]} prefs={p.prefs} />}
+            {p.items[id].kind === 'note' ? (
+              <NoteEditor id={id} active={id === p.pane.active} />
+            ) : p.items[id].kind === 'video' ? (
+              <VideoView item={p.items[id]} active={id === p.pane.active} />
+            ) : (
+              <DocView item={p.items[id]} prefs={p.prefs} />
+            )}
           </div>
         ))}
       </div>

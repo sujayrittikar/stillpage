@@ -1,13 +1,14 @@
 import { useMemo, useState } from 'react'
 import type { Item } from '../lib/types'
 import type { Vault } from '../lib/vault'
+import { parseYouTube, type VideoRef } from '../lib/youtube'
 import { Icon } from './Icon'
 
 interface Candidate {
   key: string
   name: string
   where: string
-  kind: 'note' | 'doc'
+  kind: 'note' | 'doc' | 'video'
   open: () => void
 }
 
@@ -37,11 +38,12 @@ interface Props {
   vault: Vault | null
   onOpenItem: (id: string) => void
   onOpenPath: (file: string) => void
+  onOpenVideo: (ref: VideoRef) => void
   onClose: () => void
 }
 
 /** Ctrl P: type a few letters of any note, document or file in the folder. */
-export function QuickOpen({ items, vault, onOpenItem, onOpenPath, onClose }: Props) {
+export function QuickOpen({ items, vault, onOpenItem, onOpenPath, onOpenVideo, onClose }: Props) {
   const [q, setQ] = useState('')
   const [index, setIndex] = useState(0)
 
@@ -50,7 +52,7 @@ export function QuickOpen({ items, vault, onOpenItem, onOpenPath, onClose }: Pro
     const fromLibrary = Object.values(items)
       .filter((i) => !(i.path && inVault.has(i.path)))
       .sort((a, b) => b.lastOpenedAt - a.lastOpenedAt)
-      .map<Candidate>((i) => ({ key: i.id, name: i.title, where: i.kind === 'note' ? 'Note' : 'Library', kind: i.kind, open: () => onOpenItem(i.id) }))
+      .map<Candidate>((i) => ({ key: i.id, name: i.title, where: i.kind === 'note' ? 'Note' : i.kind === 'video' ? 'YouTube' : 'Library', kind: i.kind, open: () => onOpenItem(i.id) }))
     const fromVault = (vault?.files ?? []).map<Candidate>((f) => ({
       key: f.path,
       name: f.name.replace(/\.(md|markdown)$/i, ''),
@@ -62,14 +64,17 @@ export function QuickOpen({ items, vault, onOpenItem, onOpenPath, onClose }: Pro
   }, [items, vault, onOpenItem, onOpenPath])
 
   const results = useMemo(() => {
+    // A pasted YouTube link: watch it.
+    const ref = parseYouTube(q)
+    if (ref) return [{ key: 'youtube', name: 'Watch this video', where: 'YouTube', kind: 'video' as const, open: () => onOpenVideo(ref) }]
     if (!q.trim()) return candidates.slice(0, 12)
     return candidates
-      .map((c) => ({ c, s: score(q.trim(), `${c.where === 'Note' || c.where === 'Library' ? '' : c.where + '/'}${c.name}`) }))
+      .map((c) => ({ c, s: score(q.trim(), `${c.where === 'Note' || c.where === 'Library' || c.where === 'YouTube' ? '' : c.where + '/'}${c.name}`) }))
       .filter((r): r is { c: Candidate; s: number } => r.s !== null)
       .sort((a, b) => b.s - a.s)
       .slice(0, 12)
       .map((r) => r.c)
-  }, [q, candidates])
+  }, [q, candidates, onOpenVideo])
 
   const pick = (c: Candidate | undefined) => {
     if (!c) return
@@ -109,7 +114,7 @@ export function QuickOpen({ items, vault, onOpenItem, onOpenPath, onClose }: Pro
         <ul className="quick-list" role="listbox">
           {results.map((c, i) => (
             <li key={c.key} role="option" aria-selected={i === index} className={i === index ? 'on' : ''} onMouseEnter={() => setIndex(i)} onMouseDown={(e) => (e.preventDefault(), pick(c))}>
-              <Icon name={c.kind === 'note' ? 'note' : 'page'} size={14} />
+              <Icon name={c.kind === 'note' ? 'note' : c.kind === 'video' ? 'play' : 'page'} size={14} />
               <span className="quick-name">{c.name}</span>
               <span className="quick-where">{c.where}</span>
             </li>
