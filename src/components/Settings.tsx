@@ -23,6 +23,9 @@ const SHORTCUTS: [string, string][] = [
   ['Alt 1–4', 'Jump to pane'],
   ['Ctrl B / I / U', 'Bold, italic, underline in notes'],
   ['Ctrl M', 'Formula in a note (Ctrl Shift M: on its own line)'],
+  ['Ctrl V', 'Paste a YouTube link to watch it'],
+  ['Alt T', 'Timestamp from the video into your note'],
+  ['Alt K / J / L', 'Video: play or pause, back or ahead 10 s'],
 ]
 
 export function Settings({ prefs, set, onClose }: { prefs: Prefs; set: (p: Partial<Prefs>) => void; onClose: () => void }) {

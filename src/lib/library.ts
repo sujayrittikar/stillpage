@@ -1,6 +1,7 @@
 import { useSyncExternalStore } from 'react'
 import { db, uid } from './db'
 import { detectFormat, extOf } from './formats'
+import { fetchTitle, type VideoRef } from './youtube'
 import type { Item } from './types'
 
 // ---- Items (documents + notes metadata) -----------------------------------
@@ -181,6 +182,48 @@ export function createNote(initial = ''): string {
   return id
 }
 
+/** Adds a YouTube video to the library, or finds it if it's there already.
+ *  A time in the link becomes where it starts playing. */
+export function addVideo(ref: VideoRef): string {
+  const existing = Object.values(items).find((i) => i.kind === 'video' && i.video?.id === ref.id)
+  if (existing) {
+    items[existing.id] = { ...existing, ...(ref.start !== undefined && { position: ref.start }), ...(ref.list && { video: { id: ref.id, list: ref.list } }) }
+    emit()
+    persist()
+    return existing.id
+  }
+  const id = uid()
+  const now = Date.now()
+  items[id] = {
+    id,
+    kind: 'video',
+    title: 'YouTube video',
+    video: { id: ref.id, ...(ref.list && { list: ref.list }) },
+    ...(ref.start !== undefined && { position: ref.start }),
+    createdAt: now,
+    updatedAt: now,
+    lastOpenedAt: now,
+  }
+  emit()
+  persist()
+  void fetchTitle(ref.id).then((title) => {
+    if (!title || !items[id]) return
+    items[id] = { ...items[id], title }
+    emit()
+    persist()
+  })
+  return id
+}
+
+/** Remembers where you stopped watching, so the video picks up there. */
+export function setVideoPosition(id: string, seconds: number) {
+  const item = items[id]
+  if (!item || Math.abs((item.position ?? 0) - seconds) < 1) return
+  items[id] = { ...item, position: seconds }
+  emit()
+  persist()
+}
+
 /** Names a note. A named note keeps its name instead of following its first line. */
 export function renameItem(id: string, title: string) {
   const item = items[id]
@@ -229,6 +272,8 @@ export function titleFromText(text: string): string {
     line
       .replace(/^#+\s*/, '')
       .replace(/^>\s*/, '')
+      // A link reads as its text.
+      .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
       // A formula reads as its source, without the dollar signs around it.
       .replace(/\$\$?((?:\\.|[^$\\])+?)\$\$?(?!\d)/g, (all, tex: string) => (/^\S/.test(tex) && /\S$/.test(tex) ? tex : all))
       .replace(/[*_`]/g, '')

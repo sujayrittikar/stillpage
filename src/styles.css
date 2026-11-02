@@ -1351,6 +1351,79 @@ body.resizing .divider::after {
   flex-direction: column;
 }
 
+/* ---------- YouTube videos ---------- */
+
+.video {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  container-type: inline-size;
+}
+
+/* The player keeps 16:9 and fills as much of the pane as it can. */
+.video-stage {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  place-items: center;
+  padding: 12px 12px 0;
+  container-type: size;
+}
+
+.video-stage iframe {
+  width: min(100cqw, 100cqh * 16 / 9);
+  aspect-ratio: 16 / 9;
+  border: 0;
+  border-radius: 10px;
+  background: #000;
+}
+
+.video-bar {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  padding: 8px 12px 10px;
+}
+
+.video-keys {
+  margin-left: auto;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+
+/* Clear of the music pill in the bottom-right corner. */
+.pane-slot:last-child .video-bar {
+  padding-right: 130px;
+}
+
+@container (max-width: 620px) {
+  .video-keys {
+    display: none;
+  }
+}
+
+.app.zen .video-bar {
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+
+.app.zen .video-bar:hover,
+.app.zen .video-bar:focus-within {
+  opacity: 1;
+}
+
+.video-ask {
+  width: min(380px, 100%);
+  margin: 14px auto 0;
+}
+
+.video-error {
+  margin-top: 8px;
+}
+
 .note-bar {
   flex: 0 0 auto;
   display: flex;

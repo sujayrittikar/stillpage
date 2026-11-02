@@ -17,7 +17,7 @@ export type Format =
 
 export interface Item {
   id: string
-  kind: 'doc' | 'note'
+  kind: 'doc' | 'note' | 'video'
   title: string
   format?: Format
   ext?: string
@@ -34,6 +34,10 @@ export interface Item {
   draft?: boolean
   /** Named by hand, so the title no longer follows the first line. */
   named?: boolean
+  /** A YouTube video: which one, and the playlist it was opened from. */
+  video?: { id: string; list?: string }
+  /** Seconds into a video where you stopped watching. */
+  position?: number
 }
 
 export interface Pane {

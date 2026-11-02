@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { FORMAT_LABEL } from '../lib/formats'
 import type { Item } from '../lib/types'
+import { clock } from '../lib/youtube'
 import { closeVault, useVault } from '../lib/vault'
 import { Icon } from './Icon'
 import { VaultTree } from './VaultTree'
@@ -115,18 +116,18 @@ export function Library(props: Props) {
           </div>
         ) : (
         <div className="library-list">
-          {(['note', 'doc'] as const).map((kind) => {
+          {(['note', 'doc', 'video'] as const).map((kind) => {
             const list = sorted.filter((i) => i.kind === kind)
             if (!list.length) return null
             return (
               <section key={kind}>
-                <h3>{kind === 'note' ? 'Notes' : 'Documents'}</h3>
+                <h3>{kind === 'note' ? 'Notes' : kind === 'video' ? 'Videos' : 'Documents'}</h3>
                 {list.map((item) => (
                   <div key={item.id} className="lib-row">
                     <button className="lib-open" onClick={() => onOpen(item.id)}>
                       <span className="lib-title">{item.title}</span>
                       <span className="lib-meta">
-                        {item.format ? FORMAT_LABEL[item.format] : 'note'}, {ago(item.kind === 'note' ? item.updatedAt : item.lastOpenedAt)}
+                        {item.format ? FORMAT_LABEL[item.format] : item.kind === 'video' ? (item.position ? `YouTube, at ${clock(item.position)}` : 'YouTube') : 'note'}, {ago(item.kind === 'note' ? item.updatedAt : item.lastOpenedAt)}
                       </span>
                     </button>
                     <button
@@ -134,7 +135,7 @@ export function Library(props: Props) {
                       title={item.kind === 'note' ? 'Delete note' : 'Remove from library'}
                       onClick={() => {
                         const verb = item.kind === 'note' ? 'Delete the note' : 'Remove'
-                        if (confirm(`${verb} “${item.title}”?${item.kind === 'note' ? ' This cannot be undone.' : ' The file on disk is not touched.'}`)) onRemove(item.id)
+                        if (confirm(`${verb} “${item.title}”?${item.kind === 'note' ? ' This cannot be undone.' : item.kind === 'video' ? '' : ' The file on disk is not touched.'}`)) onRemove(item.id)
                       }}
                     >
                       <Icon name="trash" size={15} />
