@@ -1,6 +1,6 @@
 pkgbase = stillpage-bin
 	pkgdesc = A calm, distraction-free reader and notebook for PDFs, Office and LibreOffice files, EPUB and Markdown
-	pkgver = 0.2.3
+	pkgver = 0.2.4
 	pkgrel = 1
 	url = https://github.com/sujayrittikar/stillpage
 	install = stillpage.install
@@ -20,12 +20,12 @@ pkgbase = stillpage-bin
 	optdepends = xorg-xwayland: spanning one window across several monitors on Wayland
 	provides = stillpage
 	conflicts = stillpage
-	noextract = Stillpage-0.2.3-amd64.deb
+	noextract = Stillpage-0.2.4-amd64.deb
 	options = !strip
 	options = !debug
-	source = https://github.com/sujayrittikar/stillpage/releases/download/v0.2.3/Stillpage-0.2.3-amd64.deb
-	source = LICENSE-0.2.3::https://raw.githubusercontent.com/sujayrittikar/stillpage/v0.2.3/LICENSE
-	sha256sums = e240aa33fa970edf3072933c770d58cc7ed69b2d71b8eeee17403c29ee0bbe41
+	source = https://github.com/sujayrittikar/stillpage/releases/download/v0.2.4/Stillpage-0.2.4-amd64.deb
+	source = LICENSE-0.2.4::https://raw.githubusercontent.com/sujayrittikar/stillpage/v0.2.4/LICENSE
+	sha256sums = 2c2b630fa97c6ad4723f925d3e1d5a258b5b56b9683a3a555c98f87bf96ea433
 	sha256sums = b10bbc1e6fc9a4c4293a0950b5ad8f866d3961db825b2fb1f39c48d99d09312a
 
 pkgname = stillpage-bin

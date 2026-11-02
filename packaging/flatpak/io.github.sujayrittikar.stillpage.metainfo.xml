@@ -86,6 +86,14 @@
   </keywords>
 
   <releases>
+    <release version="0.2.4" date="2026-11-02">
+      <description>
+        <ul>
+          <li>First release on Flathub</li>
+          <li>The Flatpak version explains that files needing LibreOffice open in the other packages</li>
+        </ul>
+      </description>
+    </release>
     <release version="0.2.3" date="2026-11-02">
       <description>
         <ul>

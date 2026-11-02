@@ -35,8 +35,8 @@ modules:
     sources:
       - type: file
         dest-filename: stillpage.deb
-        url: https://github.com/sujayrittikar/stillpage/releases/download/v0.2.3/Stillpage-0.2.3-amd64.deb
-        sha256: e240aa33fa970edf3072933c770d58cc7ed69b2d71b8eeee17403c29ee0bbe41
+        url: https://github.com/sujayrittikar/stillpage/releases/download/v0.2.4/Stillpage-0.2.4-amd64.deb
+        sha256: 2c2b630fa97c6ad4723f925d3e1d5a258b5b56b9683a3a555c98f87bf96ea433
         only-arches: [x86_64]
         x-checker-data:
           type: json
